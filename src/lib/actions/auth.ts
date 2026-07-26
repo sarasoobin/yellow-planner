@@ -13,7 +13,8 @@ export type AuthState = {
 }
 
 const credentials = z.object({
-  email: z.string().email('이메일 형식이 올바르지 않습니다.'),
+  // Zod 4부터는 z.string().email() 대신 z.email() 을 쓴다
+  email: z.email('이메일 형식이 올바르지 않습니다.'),
   password: z.string().min(6, '비밀번호는 6자 이상이어야 합니다.'),
 })
 
