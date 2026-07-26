@@ -1,7 +1,11 @@
 import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-export async function middleware(request: NextRequest) {
+/**
+ * Next.js 16부터 middleware.ts 대신 proxy.ts 를 쓴다.
+ * 모든 요청이 페이지에 도달하기 전에 이 함수를 먼저 지나간다.
+ */
+export default async function proxy(request: NextRequest) {
   return await updateSession(request)
 }
 
