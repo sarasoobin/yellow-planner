@@ -120,10 +120,13 @@
 
 ## 8. 이름
 
-- **正 PLANNER**
-- GitHub 레포 / Vercel 프로젝트: `jeong-planner`
-- 배포 주소: `https://jeong-planner.vercel.app`
+- 표시 이름: **正 PLANNER**
+- GitHub 레포 / Vercel 프로젝트: `yellow-planner`
+- 배포 주소: `https://yellow-planner.vercel.app`
 - 파비콘: `正` 한 글자
+
+> 주소를 `jeong-planner`로 하지 않은 이유: 영어권에서 "정씨의 플래너"로 읽힙니다.
+> 노란 공책 컨셉을 주소에 쓰고, 正은 화면과 로고에서 보여줍니다.
 
 **正을 고른 이유** (README에 그대로 쓸 문장)
 > 正은 획을 하나씩 그어 다섯을 세는 표시다. 계획은 세우는 것보다 지워나가는 것이라서, 세는 글자를 이름으로 삼았다.
