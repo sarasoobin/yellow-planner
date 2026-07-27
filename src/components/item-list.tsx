@@ -60,14 +60,16 @@ function AddItemForm({
 }: Pick<Props, 'kind' | 'date' | 'path'> & { placeholder: string }) {
   const [state, formAction, pending] = useActionState(createItem, EMPTY)
   const formRef = useRef<HTMLFormElement>(null)
-  const isFirstRender = useRef(true)
+  const handled = useRef<FormState | null>(null)
 
   // 저장에 성공하면 입력칸을 비워 다음 항목을 바로 적을 수 있게 한다
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
-    }
+    // EMPTY는 제출 전 초기값이다. 액션이 돌면 항상 새 객체가 오므로 참조로 구분한다.
+    if (state === EMPTY) return
+    // StrictMode가 effect를 두 번 실행해도 한 번만 처리한다
+    if (handled.current === state) return
+    handled.current = state
+
     if (!state.error) formRef.current?.reset()
   }, [state])
 
@@ -166,13 +168,15 @@ function EditItemForm({
   onDone: () => void
 }) {
   const [state, formAction] = useActionState(updateItem, EMPTY)
-  const isFirstRender = useRef(true)
+  const handled = useRef<FormState | null>(null)
 
+  // 저장에 성공했을 때만 수정 모드를 닫는다.
+  // 열자마자 닫히지 않도록 "아직 제출 전"과 "이미 처리함"을 모두 걸러낸다.
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
-    }
+    if (state === EMPTY) return
+    if (handled.current === state) return
+    handled.current = state
+
     if (!state.error) onDone()
   }, [state, onDone])
 
