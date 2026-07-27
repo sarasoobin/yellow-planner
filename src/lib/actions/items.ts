@@ -43,6 +43,7 @@ const STYLE = z.object({
   italic: z.boolean().optional(),
   highlight: z.boolean().optional(),
   check: z.boolean().optional(),
+  size: z.enum(['sm', 'md', 'lg', 'xl']).optional(),
   sticker: z.string().max(32).nullable().optional(),
   x: z.number().min(0).max(100).optional(),
   y: z.number().min(0).max(100).optional(),
@@ -99,21 +100,30 @@ export async function createItem(
   } = await supabase.auth.getUser()
   if (!user) return { error: '로그인이 필요합니다.' }
 
-  // 새 항목은 늘 맨 아래에 붙는다.
-  // 기본값 0으로 두면 순서를 바꾼 뒤 추가한 것이 중간에 끼어든다.
-  const { data: last } = await supabase
-    .from('items')
-    .select('sort_order')
-    .eq('kind', parsed.data.kind)
-    .eq('date', parsed.data.date)
-    .order('sort_order', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  /**
+   * sort_order 는 "공책의 몇째 줄"이다.
+   * 누른 줄 번호가 함께 오면 그 자리에 그대로 남기고,
+   * 없으면(달력 칸처럼 줄 개념이 없는 곳) 맨 아래에 붙인다.
+   */
+  const line = Number(formData.get('line'))
+  let sortOrder = Number.isInteger(line) && line >= 0 ? line : null
+
+  if (sortOrder === null) {
+    const { data: last } = await supabase
+      .from('items')
+      .select('sort_order')
+      .eq('kind', parsed.data.kind)
+      .eq('date', parsed.data.date)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    sortOrder = (last?.sort_order ?? -1) + 1
+  }
 
   const { error } = await supabase.from('items').insert({
     ...parsed.data,
     user_id: user.id,
-    sort_order: (last?.sort_order ?? -1) + 1,
+    sort_order: sortOrder,
     style: parseStyle(formData.get('style')),
   })
 
@@ -245,16 +255,22 @@ export async function setItemCheck(formData: FormData) {
  * 남의 id가 섞여 들어와도 RLS가 막아 그 행만 0건 수정되고 끝난다.
  */
 export async function reorderItems(formData: FormData) {
-  const raw = formData.get('ids')
+  const raw = formData.get('lines')
   if (typeof raw !== 'string') return
 
-  const ids = raw.split(',').filter(Boolean)
-  if (ids.length === 0 || ids.length > 200) return
+  // "줄번호:id" 짝으로 온다. 어느 줄이 채워져 있었는지는 그대로 두고 내용만 옮긴다.
+  const pairs = raw
+    .split(',')
+    .map((pair) => pair.split(':'))
+    .filter(([line, id]) => id && Number.isInteger(Number(line)))
+    .map(([line, id]) => ({ line: Number(line), id }))
+
+  if (pairs.length === 0 || pairs.length > 200) return
 
   const supabase = await createClient()
   await Promise.all(
-    ids.map((id, index) =>
-      supabase.from('items').update({ sort_order: index }).eq('id', id),
+    pairs.map(({ line, id }) =>
+      supabase.from('items').update({ sort_order: line }).eq('id', id),
     ),
   )
 

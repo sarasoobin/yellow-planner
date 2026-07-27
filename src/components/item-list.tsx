@@ -11,6 +11,7 @@ import {
 } from '@/lib/actions/items'
 import { DEFAULT_DRAFT, WritingInput } from '@/components/writing-input'
 import { CheckMark, Sticker, writtenStyle } from '@/components/written'
+import { lastLineOf, layoutLines } from '@/lib/lines'
 import {
   defaultCheck,
   type FormState,
@@ -20,6 +21,14 @@ import {
 
 const EMPTY: FormState = { error: null }
 
+/**
+ * 공책의 한 면.
+ *
+ * 종이처럼 아무 줄이나 눌러서 바로 쓸 수 있다. 일곱째 줄을 누르면
+ * 일곱째 줄에 남는다 — 줄 번호를 sort_order 에 저장하기 때문이다.
+ * Enter 를 치면 아래 줄로 내려간다. 체크박스는 `/` 로 줄마다 붙인다.
+ */
+
 type Props = {
   items: Item[]
   kind: ItemKind
@@ -27,18 +36,12 @@ type Props = {
   date: string
   /** 저장 후 새로 그릴 경로 */
   path: string
-  /** 내용이 적든 많든 최소 이만큼은 줄을 그어둔다 (공책 느낌) */
+  /** 최소 이만큼은 줄을 그어둔다 */
   minRows?: number
   placeholder?: string
 }
 
-/**
- * 빈 줄이든 글이 적힌 줄이든 높이가 같아야 괘선이 일정하다.
- * items-end 로 내용을 아래로 붙여야 글자가 줄 위에 앉는다.
- */
 const ROW = 'flex h-line items-end gap-2 border-b border-rule pb-[3px]'
-
-/** 체크박스 자리. 네모가 없는 줄도 이 폭을 비워둬야 글머리가 나란해진다. */
 const SLOT = 'relative size-[13px] shrink-0'
 
 export function ItemList({
@@ -49,57 +52,65 @@ export function ItemList({
   minRows = 4,
   placeholder = '',
 }: Props) {
-  // + 를 눌러 늘린 줄 수. 기본 줄을 다 채웠을 때만 필요하다.
+  const [active, setActive] = useState<number | null>(null)
   const [extraRows, setExtraRows] = useState(0)
 
-  // 항상 최소 한 줄은 쓸 수 있어야 한다 (그 줄이 입력칸이 된다)
-  const blankRows = Math.max(minRows - items.length, 1) + extraRows
+  const byLine = useMemo(() => layoutLines(items), [items])
+  const rows =
+    Math.max(minRows, lastLineOf(byLine) + 2, (active ?? -1) + 2) + extraRows
 
   const listRef = useRef<HTMLUListElement>(null)
   const orderRef = useRef<HTMLInputElement>(null)
   const orderFormRef = useRef<HTMLFormElement>(null)
+  const geom = useRef<{ top: number; height: number } | null>(null)
 
+  // 적힌 줄만 순서대로. 드래그는 이 순서 위에서 자리를 바꾼다.
+  const occupied = useMemo(
+    () => [...byLine.keys()].sort((a, b) => a - b),
+    [byLine],
+  )
   const [from, setFrom] = useState<number | null>(null)
   const [to, setTo] = useState<number | null>(null)
 
-  /**
-   * 드래그 중 위치 계산에 쓸 기준값.
-   * 줄 높이가 모두 같아서 "시작 위치 + 줄 높이"만 알면 몇 번째 줄인지 나온다.
-   * 화면에서 줄이 섞여도 이 기준은 흔들리지 않는다.
-   */
-  const geom = useRef<{ top: number; height: number } | null>(null)
-
-  // 드래그하는 동안 보이는 순서. 손을 떼기 전에 결과를 미리 보여준다.
-  const view = useMemo(() => {
-    if (from === null || to === null || from === to) return items
-    const next = [...items]
+  // 끄는 동안 보여줄 순서. 어느 줄이 채워져 있는지는 그대로 두고 내용만 옮긴다.
+  const preview = useMemo(() => {
+    if (from === null || to === null || from === to) return byLine
+    const ordered = occupied.map((line) => byLine.get(line)!)
+    const next = [...ordered]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    return next
-  }, [items, from, to])
 
-  function startDrag(index: number, event: React.PointerEvent) {
+    const shuffled = new Map<number, Item>()
+    occupied.forEach((line, i) => shuffled.set(line, next[i]))
+    return shuffled
+  }, [byLine, occupied, from, to])
+
+  function orderedIndexAt(clientY: number): number {
+    if (!geom.current) return 0
+    const { top, height } = geom.current
+    const row = Math.floor((clientY - top) / height)
+    const count = occupied.filter((line) => line < row).length
+    return Math.min(Math.max(count, 0), occupied.length - 1)
+  }
+
+  function startDrag(orderedIndex: number, event: React.PointerEvent) {
     const first = listRef.current?.children[0] as HTMLElement | undefined
     if (!first) return
-
     const rect = first.getBoundingClientRect()
     geom.current = { top: rect.top, height: rect.height }
 
     event.currentTarget.setPointerCapture(event.pointerId)
-    setFrom(index)
-    setTo(index)
-  }
-
-  function moveDrag(event: React.PointerEvent) {
-    if (from === null || !geom.current) return
-    const { top, height } = geom.current
-    const raw = Math.floor((event.clientY - top) / height)
-    setTo(Math.min(Math.max(raw, 0), items.length - 1))
+    setFrom(orderedIndex)
+    setTo(orderedIndex)
   }
 
   function endDrag() {
     if (from !== null && to !== null && from !== to && orderRef.current) {
-      orderRef.current.value = view.map((item) => item.id).join(',')
+      // "줄번호:id" 로 넘긴다. 어느 줄이 채워져 있었는지를 그대로 유지한다.
+      orderRef.current.value = occupied
+        .map((line) => `${line}:${preview.get(line)?.id ?? ''}`)
+        .filter((pair) => !pair.endsWith(':'))
+        .join(',')
       orderFormRef.current?.requestSubmit()
     }
     setFrom(null)
@@ -109,50 +120,58 @@ export function ItemList({
 
   return (
     <div className="flex flex-col">
-      {/* 순서 저장 전용 폼. 화면에는 보이지 않는다. */}
       <form ref={orderFormRef} action={reorderItems} className="hidden">
         <input type="hidden" name="path" value={path} />
-        <input ref={orderRef} type="hidden" name="ids" defaultValue="" />
+        <input ref={orderRef} type="hidden" name="lines" defaultValue="" />
       </form>
 
       <ul
         ref={listRef}
         className={`flex flex-col ${from !== null ? 'select-none' : ''}`}
       >
-        {view.map((item, index) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            kind={kind}
-            path={path}
-            dragging={from !== null && to === index}
-            onDragStart={(event) => startDrag(index, event)}
-            onDragMove={moveDrag}
-            onDragEnd={endDrag}
-          />
-        ))}
+        {Array.from({ length: rows }, (_, line) => {
+          const item = preview.get(line)
+          const orderedIndex = occupied.indexOf(line)
 
-        {/* 첫 빈 줄은 바로 쓸 수 있는 입력칸, 나머지는 그냥 그어둔 줄 */}
-        <li className={ROW}>
-          <AddItemForm
-            kind={kind}
-            date={date}
-            path={path}
-            placeholder={placeholder}
-          />
-        </li>
+          if (active === line) {
+            return (
+              <li key={`edit-${line}`} className={ROW}>
+                <LineEditor
+                  item={item}
+                  line={line}
+                  kind={kind}
+                  date={date}
+                  path={path}
+                  placeholder={line === 0 ? placeholder : ''}
+                  onNext={() => setActive(line + 1)}
+                  onClose={() => setActive(null)}
+                />
+              </li>
+            )
+          }
 
-        {Array.from({ length: Math.max(blankRows - 1, 0) }, (_, i) => (
-          <li key={`blank-${i}`} className={ROW}>
-            <span className={SLOT} />
-          </li>
-        ))}
+          return (
+            <StaticLine
+              key={item?.id ?? `blank-${line}`}
+              item={item}
+              kind={kind}
+              path={path}
+              dragging={from !== null && to === orderedIndex}
+              onWrite={() => setActive(line)}
+              onDragStart={(e) => startDrag(orderedIndex, e)}
+              onDragMove={(e) => {
+                if (from !== null) setTo(orderedIndexAt(e.clientY))
+              }}
+              onDragEnd={endDrag}
+            />
+          )
+        })}
       </ul>
 
       <button
         type="button"
-        onClick={() => setExtraRows((n) => n + 1)}
-        aria-label="줄 추가"
+        onClick={() => setExtraRows((n) => n + 3)}
+        aria-label="줄 늘리기"
         className="mt-1 w-fit cursor-pointer px-1 text-sm leading-none text-ink-faint/70 transition-colors hover:text-accent"
       >
         +
@@ -161,85 +180,32 @@ export function ItemList({
   )
 }
 
-function AddItemForm({
-  kind,
-  date,
-  path,
-  placeholder,
-}: Pick<Props, 'kind' | 'date' | 'path'> & { placeholder: string }) {
-  const [state, formAction, pending] = useActionState(createItem, EMPTY)
-  const formRef = useRef<HTMLFormElement>(null)
-  const handled = useRef<FormState | null>(null)
-
-  // 새 줄에 네모를 그릴지는 어디에 적느냐로 정한다. `/` 로 줄마다 바꿀 수 있다.
-  const initial = {
-    color: DEFAULT_DRAFT.color,
-    style: { check: defaultCheck(kind) },
-  }
-
-  // 저장에 성공하면 입력칸을 비워 다음 줄을 바로 적을 수 있게 한다
-  useEffect(() => {
-    // EMPTY는 제출 전 초기값이다. 액션이 돌면 항상 새 객체가 오므로 참조로 구분한다.
-    if (state === EMPTY) return
-    // StrictMode가 effect를 두 번 실행해도 한 번만 처리한다
-    if (handled.current === state) return
-    handled.current = state
-
-    if (!state.error) formRef.current?.reset()
-  }, [state])
-
-  return (
-    <form
-      ref={formRef}
-      action={formAction}
-      className="flex w-full items-end gap-2"
-    >
-      <input type="hidden" name="kind" value={kind} />
-      <input type="hidden" name="date" value={date} />
-      <input type="hidden" name="path" value={path} />
-
-      <WritingInput
-        initial={initial}
-        placeholder={placeholder}
-        ariaLabel={placeholder || '새 항목'}
-        disabled={pending}
-        showBox
-        className="text-[14px]"
-      />
-
-      {state.error && (
-        <span role="alert" className="shrink-0 text-[10px] text-danger">
-          {state.error}
-        </span>
-      )}
-    </form>
-  )
-}
-
-function ItemRow({
+/** 아직 안 누른 줄. 눌러야 쓸 수 있게 되는 게 아니라, 누르는 순간 바로 써진다. */
+function StaticLine({
   item,
   kind,
   path,
   dragging,
+  onWrite,
   onDragStart,
   onDragMove,
   onDragEnd,
 }: {
-  item: Item
+  item?: Item
   kind: ItemKind
   path: string
   dragging: boolean
-  onDragStart: (event: React.PointerEvent) => void
-  onDragMove: (event: React.PointerEvent) => void
+  onWrite: () => void
+  onDragStart: (e: React.PointerEvent) => void
+  onDragMove: (e: React.PointerEvent) => void
   onDragEnd: () => void
 }) {
-  const [editing, setEditing] = useState(false)
-  const hasBox = item.style?.check ?? defaultCheck(kind)
+  const hasBox = item ? (item.style?.check ?? defaultCheck(kind)) : false
 
   return (
     <li className={`group ${ROW} ${dragging ? 'bg-frame/40' : ''}`}>
       <span className={SLOT}>
-        {hasBox && (
+        {item && hasBox && (
           <form action={toggleItem} className="flex">
             <input type="hidden" name="id" value={item.id} />
             <input type="hidden" name="is_done" value={String(item.is_done)} />
@@ -248,28 +214,21 @@ function ItemRow({
               type="submit"
               aria-pressed={item.is_done}
               aria-label={`${item.content} ${item.is_done ? '완료 취소' : '완료'}`}
-              // 체크박스도 그때 쓴 펜으로 그린 것처럼 같은 색을 옅게 쓴다
               style={item.color ? { borderColor: `${item.color}66` } : undefined}
               className="block size-[13px] cursor-pointer border border-rule transition-colors hover:border-today"
             />
           </form>
         )}
-        {hasBox && item.is_done && <CheckMark />}
+        {item && hasBox && item.is_done && <CheckMark />}
       </span>
 
-      {editing ? (
-        <EditItemForm
-          item={item}
-          path={path}
-          onDone={() => setEditing(false)}
-        />
-      ) : (
-        <>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="flex min-w-0 flex-1 cursor-text items-center gap-1 text-left text-[14px]"
-          >
+      <button
+        type="button"
+        onClick={onWrite}
+        className="flex min-w-0 flex-1 cursor-text items-center gap-1 self-stretch text-left"
+      >
+        {item && (
+          <>
             <Sticker name={item.style?.sticker} />
             <span
               className="truncate"
@@ -277,103 +236,153 @@ function ItemRow({
             >
               {item.content}
             </span>
+          </>
+        )}
+      </button>
+
+      {item && (
+        <div className="flex shrink-0 items-center gap-0.5 opacity-45 transition-opacity focus-within:opacity-100 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+          <form action={setItemCheck} className="flex">
+            <input type="hidden" name="id" value={item.id} />
+            <input type="hidden" name="path" value={path} />
+            <input type="hidden" name="check" value={String(!hasBox)} />
+            <button
+              type="submit"
+              aria-label={hasBox ? '체크박스 떼기' : '체크박스 붙이기'}
+              title={hasBox ? '체크박스 떼기' : '체크박스 붙이기'}
+              className={`px-0.5 text-[11px] leading-none ${
+                hasBox
+                  ? 'text-accent hover:text-danger'
+                  : 'text-ink-faint/60 hover:text-accent'
+              }`}
+            >
+              ☐
+            </button>
+          </form>
+
+          <button
+            type="button"
+            aria-label={`${item.content} 순서 바꾸기`}
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
+            className="cursor-grab touch-none px-0.5 text-[11px] leading-none text-ink-faint/60 active:cursor-grabbing"
+          >
+            ⠿
           </button>
 
-          {/*
-            md:opacity-0 을 뒤에 붙였더니 group-hover 규칙을 덮어써서
-            데스크톱에서 이 버튼들이 아예 안 보였다. 순서가 중요하다.
-          */}
-          <div className="flex shrink-0 items-center gap-0.5 opacity-45 transition-opacity focus-within:opacity-100 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100">
-            {/* 이 줄에만 네모를 붙이거나 뗀다 */}
-            <form action={setItemCheck} className="flex">
-              <input type="hidden" name="id" value={item.id} />
-              <input type="hidden" name="path" value={path} />
-              <input type="hidden" name="check" value={String(!hasBox)} />
-              <button
-                type="submit"
-                aria-label={hasBox ? '체크박스 떼기' : '체크박스 붙이기'}
-                title={hasBox ? '체크박스 떼기' : '체크박스 붙이기'}
-                className={`px-0.5 text-[11px] leading-none transition-colors ${
-                  hasBox
-                    ? 'text-accent hover:text-danger'
-                    : 'text-ink-faint/60 hover:text-accent'
-                }`}
-              >
-                ☐
-              </button>
-            </form>
-
-            {/* 순서 바꾸기 손잡이 */}
+          <form action={deleteItem} className="flex">
+            <input type="hidden" name="id" value={item.id} />
+            <input type="hidden" name="path" value={path} />
             <button
-              type="button"
-              aria-label={`${item.content} 순서 바꾸기`}
-              onPointerDown={onDragStart}
-              onPointerMove={onDragMove}
-              onPointerUp={onDragEnd}
-              onPointerCancel={onDragEnd}
-              className="cursor-grab touch-none px-0.5 text-[11px] leading-none text-ink-faint/60 active:cursor-grabbing"
+              type="submit"
+              aria-label={`${item.content} 삭제`}
+              className="px-0.5 text-xs leading-none text-ink-faint/60 hover:text-danger"
             >
-              ⠿
+              ✕
             </button>
-
-            <form action={deleteItem} className="flex">
-              <input type="hidden" name="id" value={item.id} />
-              <input type="hidden" name="path" value={path} />
-              <button
-                type="submit"
-                aria-label={`${item.content} 삭제`}
-                className="px-0.5 text-xs leading-none text-ink-faint/60 hover:text-danger"
-              >
-                ✕
-              </button>
-            </form>
-          </div>
-        </>
+          </form>
+        </div>
       )}
     </li>
   )
 }
 
-function EditItemForm({
+/** 지금 쓰고 있는 줄. 있으면 고치고, 없으면 새로 만든다. */
+export function LineEditor({
   item,
+  line,
+  kind,
+  date,
   path,
-  onDone,
+  placeholder = '',
+  showBox = true,
+  className = 'text-[14px]',
+  onNext,
+  onClose,
 }: {
-  item: Item
+  item?: Item
+  line: number
+  kind: ItemKind
+  date: string
   path: string
-  onDone: () => void
+  placeholder?: string
+  showBox?: boolean
+  className?: string
+  onNext: () => void
+  onClose: () => void
 }) {
-  const [state, formAction] = useActionState(updateItem, EMPTY)
+  const [state, formAction] = useActionState(
+    item ? updateItem : createItem,
+    EMPTY,
+  )
   const handled = useRef<FormState | null>(null)
+  // Enter로 저장했으면 결과가 온 뒤 아래 줄로 내려간다
+  const goDown = useRef(false)
 
-  // 저장에 성공했을 때만 수정 모드를 닫는다.
-  // 열자마자 닫히지 않도록 "아직 제출 전"과 "이미 처리함"을 모두 걸러낸다.
   useEffect(() => {
     if (state === EMPTY) return
     if (handled.current === state) return
     handled.current = state
+    if (state.error) return
 
-    if (!state.error) onDone()
-  }, [state, onDone])
+    if (goDown.current) {
+      goDown.current = false
+      onNext()
+    } else {
+      onClose()
+    }
+  }, [state, onNext, onClose])
 
   return (
-    <form action={formAction} className="flex min-w-0 flex-1 items-end gap-1">
-      <input type="hidden" name="id" value={item.id} />
+    <form action={formAction} className="flex w-full items-end gap-2">
+      {item ? (
+        <input type="hidden" name="id" value={item.id} />
+      ) : (
+        <>
+          <input type="hidden" name="kind" value={kind} />
+          <input type="hidden" name="date" value={date} />
+          {/* 누른 줄에 그대로 남게 줄 번호를 함께 보낸다 */}
+          <input type="hidden" name="line" value={line} />
+        </>
+      )}
       <input type="hidden" name="path" value={path} />
+
       <WritingInput
-        defaultValue={item.content}
-        ariaLabel="내용 수정"
         autoFocus
-        // 고칠 때는 그 줄에 원래 쓰인 도구에서 시작한다
-        initial={{ color: item.color ?? '#3A3226', style: item.style ?? {} }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onDone()
+        defaultValue={item?.content ?? ''}
+        placeholder={placeholder}
+        required={false}
+        initial={{
+          color: item?.color ?? DEFAULT_DRAFT.color,
+          style: item?.style ?? { check: defaultCheck(kind) },
         }}
-        // 다른 곳을 눌러도 적은 것이 날아가지 않게 그냥 저장한다.
-        // 글자는 그대로 두고 `/` 로 꾸미기만 바꿨을 수도 있어 내용 비교로는 부족하다.
-        onBlur={(e) => e.currentTarget.form?.requestSubmit()}
-        className="text-[14px]"
+        showBox={showBox}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            onClose()
+            return
+          }
+          if (e.key !== 'Enter') return
+
+          // 빈 줄에서 Enter는 그냥 한 칸 내려간다. 종이에서 하듯이.
+          if (!e.currentTarget.value.trim()) {
+            e.preventDefault()
+            onClose()
+            onNext()
+            return
+          }
+          goDown.current = true
+        }}
+        onBlur={(e) => {
+          const value = e.currentTarget.value.trim()
+          if (!value || value === item?.content) onClose()
+          else e.currentTarget.form?.requestSubmit()
+        }}
+        className={className}
       />
+
       {state.error && (
         <span role="alert" className="shrink-0 text-[10px] text-danger">
           {state.error}

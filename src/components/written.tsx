@@ -1,5 +1,5 @@
 import { HIGHLIGHT, stickerSrc } from '@/lib/stickers'
-import type { Item, ItemStyle } from '@/lib/types'
+import { SIZES, type Item, type ItemStyle } from '@/lib/types'
 
 /**
  * 적힌 한 줄을 그대로 보여준다 — 펜 색, 굵게, 기울임, 형광펜, 스티커.
@@ -23,6 +23,8 @@ export function writtenStyle(
     fontWeight: style?.bold ? 700 : undefined,
     fontStyle: style?.italic ? 'italic' : undefined,
     backgroundColor: style?.highlight ? HIGHLIGHT : undefined,
+    // 크기를 안 정했으면 그 자리의 기본 크기를 그대로 쓴다
+    fontSize: style?.size ? `${SIZES[style.size]}px` : undefined,
     ...(isDone ? STRIKE : null),
   }
 }

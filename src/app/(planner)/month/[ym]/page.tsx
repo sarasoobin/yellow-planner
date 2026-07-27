@@ -91,13 +91,13 @@ export default async function MonthPage({ params }: Params) {
       <aside className="flex shrink-0 flex-col border-b border-rule bg-frame/30 px-3 py-4 md:w-40 md:border-r md:border-b-0">
         <h1 className="mb-3 text-2xl font-bold text-ink">{monthLabel(ym)}</h1>
 
-        {/* 여기는 자유롭게 적는 칸이다. 체크할 게 생기면 줄마다 네모를 붙인다. */}
+        {/* 그냥 메모장이다. 줄글을 주르륵 적고, 체크할 게 생기면 `/` 로 네모를 붙인다. */}
         <ItemList
           items={monthItems}
           kind="month"
           date={firstDay}
           path={path}
-          minRows={5}
+          minRows={12}
         />
 
         {monthDone > 0 && (
@@ -125,7 +125,7 @@ export default async function MonthPage({ params }: Params) {
         {/* 남는 세로 공간을 주(週) 수만큼 나눠 가져 칸이 최대한 커진다 */}
         <div className="flex flex-1 flex-col border-t border-l border-rule">
           {grid.map((week) => (
-            <div key={week[0]} className="flex flex-1">
+            <div key={week[0]} className="flex min-h-[88px] flex-1">
               {/* 주차 버튼 — 그 주의 주간 페이지로 (DESIGN.md §5-3) */}
               <Link
                 href={`/week/${week[0]}`}
@@ -152,7 +152,7 @@ export default async function MonthPage({ params }: Params) {
         </div>
 
         <p className="mt-2 text-[11px] text-ink-faint">
-          칸을 누르면 날짜 옆에 바로 적을 수 있습니다. 왼쪽{' '}
+          날짜 옆 줄이 그 날 가장 중요한 일정, 그 아래가 나머지입니다. 왼쪽{' '}
           <span className="text-accent">›</span> 나 날짜를 누르면 그 주의 주간
           페이지로 갑니다.
         </p>

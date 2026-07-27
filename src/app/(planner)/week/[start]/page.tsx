@@ -7,7 +7,6 @@ import { NoteEditor } from '@/components/note-editor'
 import { StickerLayer } from '@/components/sticker-layer'
 import { Sticker, writtenStyle } from '@/components/written'
 import {
-  WEEKDAY_LABELS,
   dayNumber,
   fromISODate,
   todayISO,
@@ -16,6 +15,9 @@ import {
   weekStartOf,
 } from '@/lib/dates'
 import type { Item } from '@/lib/types'
+
+/** 디자인 시안(JE_바름이5.pdf)을 따라 요일은 영문 소문자로 적는다 */
+const WEEKDAY_EN = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 type Params = { params: Promise<{ start: string }> }
 
@@ -63,24 +65,21 @@ export default async function WeekPage({ params }: Params) {
   const items = (itemData ?? []) as Item[]
 
   // 스티커는 주 시작일에 붙는다. 페이지 하나에 한 묶음이다.
-  const stickers = items.filter(
-    (i) => i.kind === 'sticker' && i.date === monday,
-  )
+  const stickers = items.filter((i) => i.kind === 'sticker' && i.date === monday)
 
   const eventsByDate = new Map<string, Item[]>()
   const tasksByDate = new Map<string, Item[]>()
   const dailyByDate = new Map<string, Item>()
   for (const item of items) {
-    if (item.kind === 'sticker') {
-      continue
-    } else if (item.kind === 'daily') {
+    if (item.kind === 'sticker') continue
+    if (item.kind === 'daily') {
       dailyByDate.set(item.date, item)
-    } else {
-      const bucket = item.kind === 'event' ? eventsByDate : tasksByDate
-      const list = bucket.get(item.date) ?? []
-      list.push(item)
-      bucket.set(item.date, list)
+      continue
     }
+    const bucket = item.kind === 'event' ? eventsByDate : tasksByDate
+    const list = bucket.get(item.date) ?? []
+    list.push(item)
+    bucket.set(item.date, list)
   }
 
   return (
@@ -116,66 +115,74 @@ export default async function WeekPage({ params }: Params) {
             return (
               <section
                 key={date}
-                className={`flex min-w-0 flex-col gap-1 border-b border-rule p-1.5 last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0 ${
+                className={`flex min-w-0 flex-col border-b border-rule last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0 ${
                   isToday ? 'bg-frame/25' : ''
                 }`}
               >
-                {/* 요일 · 날짜 · 그 날 한 줄 */}
-                <div className="flex items-center gap-1.5">
+                {/* 요일 · 날짜 · 그 날 한 줄 — 시안의 머리 띠 */}
+                <div className="flex items-center gap-1.5 border-b border-rule px-1.5 py-1.5">
                   <span
-                    className={`shrink-0 text-[11px] font-semibold ${
+                    className={`shrink-0 text-[11px] tracking-wide ${
                       i === 6 ? 'text-today' : 'text-ink-faint'
                     }`}
                   >
-                    {WEEKDAY_LABELS[i]}
+                    {WEEKDAY_EN[i]}
                   </span>
                   <span
-                    className={`grid size-[19px] shrink-0 place-items-center rounded-full text-[12px] leading-none font-bold ${
+                    className={`grid size-[19px] shrink-0 place-items-center rounded-full text-[13px] leading-none font-bold ${
                       isToday ? 'bg-today text-paper' : 'text-ink'
                     }`}
                   >
                     {dayNumber(date)}
                   </span>
-                  <DailyLine item={dailyByDate.get(date)} date={date} path={path} />
+                  <DailyLine
+                    item={dailyByDate.get(date)}
+                    date={date}
+                    path={path}
+                  />
                 </div>
 
-                {/* 중요 일정 — 달력에서 적은 것이 올라온다. 여기선 고치지 않는다 */}
-                {events.length > 0 && (
-                  <div className="flex flex-col gap-0.5">
-                    {events.map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex items-center gap-1 text-[12px] leading-tight"
-                        title={event.content}
-                      >
-                        <span
-                          aria-hidden
-                          className="h-3 w-[3px] shrink-0"
-                          style={{ backgroundColor: event.color ?? '#C1453C' }}
-                        />
-                        <Sticker name={event.style?.sticker} />
-                        <span
-                          className="truncate"
-                          style={writtenStyle(
-                            event.color,
-                            event.style,
-                            event.is_done,
-                          )}
+                <div className="flex flex-1 flex-col px-1.5 pt-1 pb-2">
+                  {/* 달력에 적은 중요 일정이 올라온다. 여기선 고치지 않는다 */}
+                  {events.length > 0 && (
+                    <div className="mb-1 flex flex-col gap-0.5">
+                      {events.map((event) => (
+                        <div
+                          key={event.id}
+                          className="flex items-center gap-1 text-[12px] leading-tight"
+                          title={event.content}
                         >
-                          {event.content}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          <span
+                            aria-hidden
+                            className="h-3 w-[3px] shrink-0"
+                            style={{
+                              backgroundColor: event.color ?? '#C1453C',
+                            }}
+                          />
+                          <Sticker name={event.style?.sticker} />
+                          <span
+                            className="truncate"
+                            style={writtenStyle(
+                              event.color,
+                              event.style,
+                              event.is_done,
+                            )}
+                          >
+                            {event.content}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-                <ItemList
-                  items={tasks}
-                  kind="task"
-                  date={date}
-                  path={path}
-                  minRows={4}
-                />
+                  <ItemList
+                    items={tasks}
+                    kind="task"
+                    date={date}
+                    path={path}
+                    minRows={11}
+                  />
+                </div>
               </section>
             )
           })}
@@ -187,7 +194,7 @@ export default async function WeekPage({ params }: Params) {
             initialContent={noteData?.content ?? ''}
             weekStart={monday}
             path={path}
-            rows={7}
+            rows={8}
           />
         </div>
       </div>

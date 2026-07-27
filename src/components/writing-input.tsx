@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { HIGHLIGHT } from '@/lib/stickers'
 import { PENS } from '@/components/toolbar'
 import { Sticker, writtenStyle } from '@/components/written'
-import type { ItemStyle } from '@/lib/types'
+import { SIZES, type ItemStyle, type SizeKey } from '@/lib/types'
 
 /** 아무것도 고르지 않았을 때의 기본 — 검정 펜, 꾸미기 없음 */
 export const DEFAULT_DRAFT: { color: string; style: ItemStyle } = {
@@ -95,6 +95,29 @@ function buildOptions(allowCheck: boolean): Option[] {
       alias: `pen color ${pen.key}`,
       icon: <Swatch hex={pen.hex} />,
       apply: (d) => ({ ...d, color: pen.hex }),
+    })
+  }
+
+  const sizes: { key: SizeKey; label: string }[] = [
+    { key: 'sm', label: '작게' },
+    { key: 'md', label: '보통' },
+    { key: 'lg', label: '크게' },
+    { key: 'xl', label: '아주 크게' },
+  ]
+  for (const size of sizes) {
+    options.push({
+      key: `size-${size.key}`,
+      label: size.label,
+      alias: `size ${size.key} ${size.label}`,
+      icon: (
+        <span
+          className="leading-none"
+          style={{ fontSize: `${Math.min(SIZES[size.key], 15)}px` }}
+        >
+          가
+        </span>
+      ),
+      apply: (d) => ({ ...d, style: { ...d.style, size: size.key } }),
     })
   }
 

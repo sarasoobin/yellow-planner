@@ -13,11 +13,21 @@ export type ItemKind = (typeof ITEM_KINDS)[number]
  * 한 줄의 꾸미기. DB에는 items.style (jsonb) 한 칸에 통째로 들어간다.
  * 값이 없으면 기본값으로 본다 — 예전에 적은 항목도 그대로 잘 보인다.
  */
+/** 글자 크기. 종이에 크게 쓰기도 하고 작게 쓰기도 한다. */
+export const SIZES = {
+  sm: 12,
+  md: 14,
+  lg: 17,
+  xl: 21,
+} as const
+export type SizeKey = keyof typeof SIZES
+
 export type ItemStyle = {
   bold?: boolean
   italic?: boolean
   /** 형광펜 */
   highlight?: boolean
+  size?: SizeKey
   /** 체크박스를 그릴지. 없으면 kind별 기본값(defaultCheck) */
   check?: boolean
   /** 줄 앞에 붙는 스티커 이름. src/lib/stickers.ts 참고 */
