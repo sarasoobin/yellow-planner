@@ -10,8 +10,14 @@ import {
   updateItem,
 } from '@/lib/actions/items'
 import { useTool } from '@/components/toolbar'
+import { WritingInput } from '@/components/writing-input'
 import { CheckMark, Sticker, writtenStyle } from '@/components/written'
-import { defaultCheck, type FormState, type Item, type ItemKind } from '@/lib/types'
+import {
+  defaultCheck,
+  type FormState,
+  type Item,
+  type ItemKind,
+} from '@/lib/types'
 
 const EMPTY: FormState = { error: null }
 
@@ -167,9 +173,11 @@ function AddItemForm({
   const formRef = useRef<HTMLFormElement>(null)
   const handled = useRef<FormState | null>(null)
 
-  // 새 줄에 네모를 그릴지는 어디에 적느냐로 정한다. 나중에 줄마다 바꿀 수 있다.
-  const withBox = defaultCheck(kind)
-  const nextStyle = { ...style, check: withBox }
+  // 새 줄에 네모를 그릴지는 어디에 적느냐로 정한다. `/` 로 줄마다 바꿀 수 있다.
+  const initial = {
+    color: hex,
+    style: { ...style, check: defaultCheck(kind) },
+  }
 
   // 저장에 성공하면 입력칸을 비워 다음 줄을 바로 적을 수 있게 한다
   useEffect(() => {
@@ -191,26 +199,16 @@ function AddItemForm({
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
-      {/* 지금 쥔 도구가 그대로 저장된다 */}
-      <input type="hidden" name="color" value={hex} />
-      <input type="hidden" name="style" value={JSON.stringify(nextStyle)} />
 
-      <span className={SLOT}>
-        {withBox && (
-          <span aria-hidden className="block size-[13px] border border-rule" />
-        )}
-      </span>
-
-      <input
-        name="content"
-        required
-        maxLength={200}
+      <WritingInput
+        // 도구 막대를 건드리면 기본값이 바뀌어야 하니 다시 만들게 한다
+        key={`${hex}-${JSON.stringify(style)}`}
+        initial={initial}
         placeholder={placeholder}
-        aria-label={placeholder || '새 항목'}
+        ariaLabel={placeholder || '새 항목'}
         disabled={pending}
-        // 지금 고른 도구로 미리 보여준다
-        style={writtenStyle(hex, style, false)}
-        className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:bg-transparent placeholder:font-normal placeholder:text-ink-faint/60 disabled:opacity-50"
+        showBox
+        className="text-[14px]"
       />
 
       {state.error && (
@@ -285,7 +283,11 @@ function ItemRow({
             </span>
           </button>
 
-          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 md:opacity-0">
+          {/*
+            md:opacity-0 을 뒤에 붙였더니 group-hover 규칙을 덮어써서
+            데스크톱에서 이 버튼들이 아예 안 보였다. 순서가 중요하다.
+          */}
+          <div className="flex shrink-0 items-center gap-0.5 opacity-45 transition-opacity focus-within:opacity-100 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100">
             {/* 이 줄에만 네모를 붙이거나 뗀다 */}
             <form action={setItemCheck} className="flex">
               <input type="hidden" name="id" value={item.id} />
@@ -362,23 +364,19 @@ function EditItemForm({
     <form action={formAction} className="flex min-w-0 flex-1 items-end gap-1">
       <input type="hidden" name="id" value={item.id} />
       <input type="hidden" name="path" value={path} />
-      <input
-        name="content"
+      <WritingInput
         defaultValue={item.content}
-        required
-        maxLength={200}
+        ariaLabel="내용 수정"
         autoFocus
-        aria-label="내용 수정"
+        // 고칠 때는 그 줄에 원래 쓰인 도구에서 시작한다
+        initial={{ color: item.color ?? '#3A3226', style: item.style ?? {} }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onDone()
         }}
-        // 다른 곳을 눌러도 적은 내용이 날아가지 않게, 바뀌었으면 저장하고 닫는다
-        onBlur={(e) => {
-          if (e.currentTarget.value.trim() === item.content) onDone()
-          else e.currentTarget.form?.requestSubmit()
-        }}
-        style={writtenStyle(item.color, item.style, false)}
-        className="min-w-0 flex-1 bg-transparent text-[14px] outline-none"
+        // 다른 곳을 눌러도 적은 것이 날아가지 않게 그냥 저장한다.
+        // 글자는 그대로 두고 `/` 로 꾸미기만 바꿨을 수도 있어 내용 비교로는 부족하다.
+        onBlur={(e) => e.currentTarget.form?.requestSubmit()}
+        className="text-[14px]"
       />
       {state.error && (
         <span role="alert" className="shrink-0 text-[10px] text-danger">

@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import { saveDaily } from '@/lib/actions/items'
 import { useTool } from '@/components/toolbar'
-import { writtenStyle } from '@/components/written'
+import { WritingInput } from '@/components/writing-input'
 import type { FormState, Item } from '@/lib/types'
 
 const EMPTY: FormState = { error: null }
@@ -35,26 +35,19 @@ export function DailyLine({
     <form action={formAction} className="flex min-w-0 flex-1">
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
-      <input type="hidden" name="color" value={hex} />
-      <input type="hidden" name="style" value={JSON.stringify(style)} />
       {item && <input type="hidden" name="id" value={item.id} />}
 
-      <input
-        name="content"
+      <WritingInput
+        key={item?.id ?? `${hex}-${JSON.stringify(style)}`}
         defaultValue={saved}
-        maxLength={200}
-        aria-label={`${date} 한 줄`}
-        title={state.error ?? undefined}
-        onBlur={(e) => {
-          if (e.currentTarget.value.trim() !== saved) {
-            e.currentTarget.form?.requestSubmit()
-          }
-        }}
-        style={state.error ? undefined : writtenStyle(hex, style, false)}
-        className={`min-w-0 flex-1 border-b border-dotted bg-transparent pb-px text-[11px] outline-none transition-colors ${
-          state.error
-            ? 'border-danger text-danger'
-            : 'border-rule focus:border-accent'
+        initial={{ color: hex, style }}
+        ariaLabel={`${date} 한 줄`}
+        // 비우면 지운다. 빈 줄을 남겨두는 게 종이 노트에 가깝다.
+        required={false}
+        allowCheck={false}
+        onBlur={(e) => e.currentTarget.form?.requestSubmit()}
+        className={`border-b border-dotted pb-px text-[11px] ${
+          state.error ? 'border-danger' : 'border-rule focus:border-accent'
         }`}
       />
     </form>

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createItem, deleteItem } from '@/lib/actions/items'
 import { useTool } from '@/components/toolbar'
+import { WritingInput } from '@/components/writing-input'
 import { Sticker, writtenStyle } from '@/components/written'
 import { dayNumber } from '@/lib/dates'
 import type { FormState, Item } from '@/lib/types'
@@ -38,7 +39,6 @@ export function CalendarCell({
   const [state, formAction] = useActionState(createItem, EMPTY)
   const { hex, style } = useTool()
   const formRef = useRef<HTMLFormElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const handled = useRef<FormState | null>(null)
 
   // 저장되면 입력칸을 비우고 열어둔다. 한 날에 여러 개 적는 일이 흔하다.
@@ -47,10 +47,7 @@ export function CalendarCell({
     if (handled.current === state) return
     handled.current = state
 
-    if (!state.error) {
-      formRef.current?.reset()
-      inputRef.current?.focus()
-    }
+    if (!state.error) formRef.current?.reset()
   }, [state])
 
   return (
@@ -88,28 +85,20 @@ export function CalendarCell({
             <input type="hidden" name="kind" value="event" />
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="path" value={path} />
-            <input type="hidden" name="color" value={hex} />
-            {/* 달력 일정은 체크리스트가 아니다 */}
-            <input
-              type="hidden"
-              name="style"
-              value={JSON.stringify({ ...style, check: false })}
-            />
-            <input
-              ref={inputRef}
-              name="content"
-              required
-              maxLength={200}
+
+            <WritingInput
+              key={`${hex}-${JSON.stringify(style)}`}
+              // 달력 일정은 기본이 체크리스트가 아니다. `/` 로 붙일 수는 있다.
+              initial={{ color: hex, style: { ...style, check: false } }}
+              ariaLabel={`${date} 일정`}
               autoFocus
-              aria-label={`${date} 일정`}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') setWriting(false)
               }}
               onBlur={(e) => {
                 if (!e.currentTarget.value.trim()) setWriting(false)
               }}
-              style={writtenStyle(hex, style, false)}
-              className="min-w-0 flex-1 border-b border-accent bg-transparent text-[11px] leading-tight outline-none"
+              className="border-b border-accent text-[11px] leading-tight"
             />
           </form>
         ) : (

@@ -127,11 +127,16 @@ export async function updateItem(
   if (!id) return { error: '대상을 찾을 수 없습니다.' }
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
+  // `/` 메뉴로 꾸미기만 바꾸는 경우도 있어 색·꾸미기도 같이 저장한다
+  const patch: Record<string, unknown> = { content: parsed.data }
+  const color = HEX.safeParse(formData.get('color'))
+  if (color.success) patch.color = color.data
+  if (typeof formData.get('style') === 'string') {
+    patch.style = parseStyle(formData.get('style'))
+  }
+
   const supabase = await createClient()
-  const { error } = await supabase
-    .from('items')
-    .update({ content: parsed.data })
-    .eq('id', id)
+  const { error } = await supabase.from('items').update(patch).eq('id', id)
 
   if (error) return { error: '수정하지 못했습니다.' }
 
