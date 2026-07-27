@@ -17,10 +17,20 @@ export function RefreshOnFocus() {
     function refresh() {
       if (document.visibilityState !== 'visible') return
 
-      // 적고 있는 중이면 건드리지 않는다.
-      // 저장은 칸에서 손을 뗄 때 일어나므로, 지금 새로 받아오면 적던 글이 날아간다.
+      /*
+       * 적고 있는 중이면 건드리지 않는다.
+       * 저장은 칸에서 손을 뗄 때 일어나므로, 지금 새로 받아오면 적던 글이 날아간다.
+       *
+       * 노트의 칸들은 input 도 textarea 도 아닌 contenteditable 이다.
+       * 앞의 둘만 보고 있었더니 정작 노트를 적는 동안에는 이 가드가
+       * 한 번도 작동하지 않았다.
+       */
       const el = document.activeElement
-      if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+      if (
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLInputElement ||
+        (el instanceof HTMLElement && el.isContentEditable)
+      ) {
         return
       }
 

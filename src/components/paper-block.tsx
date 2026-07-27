@@ -160,8 +160,8 @@ function wrapFontSize(px: number) {
   }
 }
 
-/** 화면 밖으로 나가지 않게 가둔다 */
-function clamp(rect: DOMRect, width: number) {
+/** 막대를 글자 바로 아래에 놓되 화면 밖으로 나가지 않게 한다 */
+function positionBelow(rect: DOMRect, width: number) {
   return {
     top: Math.max(Math.min(rect.bottom + 6, window.innerHeight - 60), 8),
     left: Math.max(Math.min(rect.left, window.innerWidth - width - 8), 8),
@@ -210,16 +210,32 @@ export function PaperBlock({
   const saved = useRef<string | null>(null)
 
   /*
-   * 처음 그릴 때의 내용을 붙들어두고 다시는 바꾸지 않는다.
+   * 처음 그릴 때의 내용을 객체째로 붙들어두고 다시는 바꾸지 않는다.
    *
-   * 저장할 때마다 서버가 새 내용을 내려주는데, 그걸 그대로 반영하면
-   * React가 칸 안을 통째로 다시 그린다. 그 순간 커서가 맨 앞으로 튀어서
-   * 방금 누른 체크박스를 지우려 해도 엉뚱한 곳이 지워졌다.
+   * ⚠️ 객체를 통째로 붙드는 게 핵심이다. 값만 같은 새 객체를 넘기면 안 된다.
+   * React 19는 prop 이 바뀌었는지 값이 아니라 참조로 판단한다.
    *
-   * 대신 다른 기기에서 고친 내용은 새로고침해야 보인다.
-   * 적고 있는 칸이 멋대로 바뀌지 않는 편이 훨씬 중요하다.
+   *     if (nextProp !== lastProp) setProp(...)   // updateProperties
+   *
+   * dangerouslySetInnerHTML={{ __html: 같은문자열 }} 처럼 매번 새 객체를
+   * 만들면 내용이 같아도 참조가 달라 매 렌더마다 innerHTML 을 다시 써넣는다.
+   * 그러면 적고 있던 글이 통째로 초기값으로 되돌아가고 커서도 사라진다.
+   * `/` 를 칠 때마다 메뉴 상태가 바뀌며 다시 그려지므로, 방금 친 `/명령어`가
+   * 그 순간 지워지고 뒤이은 서식 명령은 허공에 적용됐다.
+   *
+   * 실제 크롬에서 확인한 증상: 편집기 노드는 그대로인데 자식 11개가
+   * 통째로 교체(added 11 / removed 11)되고 내용이 원래대로 돌아갔다.
+   *
+   * 대가: 이 칸은 한 번 열리면 서버 내용을 다시 받아오지 않는다.
+   * router.refresh() 같은 부드러운 갱신으로는 안 바뀐다. 그건 props 만
+   * 새로 넘길 뿐 컴포넌트를 다시 만들지 않는데, 여기서 그 props 를 안 보기
+   * 때문이다. 브라우저 새로고침이나 다른 페이지에 갔다 돌아와야 바뀐다.
+   *
+   * 그래서 두 기기에서 같은 칸을 열어두면 나중에 저장한 쪽이 앞의 것을
+   * 조용히 덮어쓴다. 혼자 쓰는 다이어리라 감수하지만, 여럿이 쓰게 되면
+   * 저장할 때 updated_at 을 비교해 충돌을 알려주는 장치가 필요하다.
    */
-  const initialHtml = useRef(toDisplayHtml(content)).current
+  const initialHtml = useRef({ __html: toDisplayHtml(content) }).current
 
   const [empty, setEmpty] = useState(() => isBlank(content))
   const [focused, setFocused] = useState(false)
@@ -289,7 +305,7 @@ export function PaperBlock({
     // 커서만 있는 자리는 크기가 0인 사각형이 나오기도 한다. 그때는 그 줄을 기준으로.
     let rect = selection.getRangeAt(0).getBoundingClientRect()
     if (!rect.height) rect = (text.parentElement ?? root).getBoundingClientRect()
-    setMenuAt(clamp(rect, 176))
+    setMenuAt(positionBelow(rect, 176))
   }
 
   /** 글자를 골랐는지 살펴 막대를 띄우거나 감춘다 */
@@ -303,11 +319,16 @@ export function PaperBlock({
     if (range.collapsed || !root.contains(range.commonAncestorContainer)) {
       return setPickedAt(null)
     }
-    setPickedAt(clamp(range.getBoundingClientRect(), 300))
+    setPickedAt(positionBelow(range.getBoundingClientRect(), 300))
+  }
+
+  /** 안내 문구를 띄울지 말지. 내용이 바뀔 만한 곳마다 다시 본다. */
+  function syncEmpty() {
+    setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
   }
 
   function handleInput() {
-    setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
+    syncEmpty()
     setPickedAt(null)
     /*
      * 일부 브라우저는 입력이 끝난 시점에 커서 위치를 아직 갱신하지 않는다.
@@ -354,7 +375,7 @@ export function PaperBlock({
       wrapFontSize(command.px)
     }
 
-    setEmpty(isBlank(root.innerHTML))
+    syncEmpty()
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -375,10 +396,8 @@ export function PaperBlock({
     }
   }
 
-  /** 그려둔 네모를 누르면 체크한다 */
+  /** 그려둔 네모를 누르면 체크한다 (고른 글자 확인은 onMouseUp 이 이미 했다) */
   function handleClick() {
-    syncPicked()
-
     const selection = window.getSelection()
     const node = selection?.anchorNode
     if (!node || node.nodeType !== Node.TEXT_NODE) return
@@ -457,9 +476,9 @@ export function PaperBlock({
             e.preventDefault()
             const text = e.clipboardData.getData('text/plain')
             document.execCommand('insertText', false, text)
-            setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
+            syncEmpty()
           }}
-          dangerouslySetInnerHTML={{ __html: initialHtml }}
+          dangerouslySetInnerHTML={initialHtml}
           style={{
             minHeight: `${minRows * rowHeight}px`,
             lineHeight: `${rowHeight}px`,
