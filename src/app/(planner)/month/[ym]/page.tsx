@@ -88,7 +88,9 @@ export default async function MonthPage({ params }: Params) {
         메모부터 보이면 달력을 보려고 스크롤을 내려야 한다.
       */}
       <aside className="order-2 flex shrink-0 flex-col border-t border-rule bg-frame/30 px-3 py-4 md:order-1 md:w-40 md:border-t-0 md:border-r">
-        <h1 className="mb-3 text-2xl font-bold text-ink">{monthLabel(ym)}</h1>
+        <h1 className="font-hand mb-2 text-4xl leading-none text-ink">
+          {monthLabel(ym)}
+        </h1>
 
         {/* 그냥 메모장이다. 체크할 게 생기면 `/` 로 네모를 그린다. */}
         <PaperBlock

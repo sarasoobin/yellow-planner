@@ -65,12 +65,12 @@ export default async function CoverPage() {
       path="/cover"
       className="flex flex-1 flex-col items-center justify-center bg-paper px-6 py-12"
     >
-      <p className="text-6xl leading-none font-bold tracking-tight text-ink md:text-7xl">
+      <p className="font-hand text-7xl leading-none text-ink md:text-8xl">
         {year}
       </p>
 
       <div className="mt-12 w-full max-w-sm">
-        <h1 className="mb-2 text-sm font-semibold tracking-[0.1em] text-ink">
+        <h1 className="font-hand mb-1 text-2xl leading-none text-ink">
           올해의 목표
         </h1>
 

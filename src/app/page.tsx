@@ -6,7 +6,7 @@ export default function LandingPage() {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-desk p-6 text-center">
       <div className="flex flex-col items-center gap-4">
         <h1 className="flex items-baseline gap-2 text-accent">
-          <span className="text-4xl leading-none font-bold">正</span>
+          <span className="font-hand text-5xl leading-none">正</span>
           <span className="text-xl font-semibold tracking-[0.16em]">
             PLANNER
           </span>

@@ -40,7 +40,7 @@ export default async function PlannerLayout({
                 href="/cover"
                 className="flex shrink-0 items-baseline gap-1.5 text-accent"
               >
-                <span className="text-xl leading-none font-bold">正</span>
+                <span className="font-hand text-2xl leading-none">正</span>
                 <span className="hidden text-sm font-semibold tracking-[0.14em] sm:inline">
                   PLANNER
                 </span>

@@ -37,7 +37,7 @@ export default async function FreeNotePage() {
       path="/note"
       className="flex flex-1 flex-col bg-paper px-4 py-4 md:px-8 md:py-6"
     >
-      <h1 className="mb-3 text-sm font-semibold tracking-[0.1em] text-ink">
+      <h1 className="font-hand mb-2 text-3xl leading-none text-ink">
         Free Note
       </h1>
 

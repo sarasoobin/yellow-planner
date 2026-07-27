@@ -20,7 +20,7 @@ export function LoginForm({ next }: { next: string }) {
   return (
     <div className="w-full max-w-sm">
       <h1 className="mb-1 flex items-baseline gap-1.5 text-accent">
-        <span className="text-2xl leading-none font-bold">正</span>
+        <span className="font-hand text-3xl leading-none">正</span>
         <span className="text-base font-semibold tracking-[0.14em]">
           PLANNER
         </span>

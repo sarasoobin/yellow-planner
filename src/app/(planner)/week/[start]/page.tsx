@@ -78,7 +78,7 @@ export default async function WeekPage({ params }: Params) {
       className="flex flex-1 flex-col bg-paper px-3 py-3 md:px-4 md:py-4"
     >
       <header className="mb-2 flex items-baseline justify-between gap-3">
-        <h1 className="text-base font-bold text-ink">
+        <h1 className="font-hand text-2xl leading-none text-ink">
           {weekRangeLabel(monday)}
         </h1>
         <Link

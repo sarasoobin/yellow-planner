@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Nanum_Pen_Script } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,6 +10,29 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+/**
+ * 손글씨는 제목·로고·연도에만 쓴다 (DESIGN.md §3).
+ * 본문까지 손글씨로 하면 할 일을 여러 줄 적었을 때 못 읽는다.
+ *
+ * display: 'swap' — 폰트를 받는 동안 글자를 감추지 않고 기본 글꼴로 먼저 보여준다.
+ * 제목이 잠깐 안 보이는 것보다 모양이 한 번 바뀌는 편이 낫다.
+ */
+const handwriting = Nanum_Pen_Script({
+  // Tailwind 쪽 토큰 이름(--font-hand)과 겹치면 서로를 가리켜 무한 참조가 된다
+  variable: "--font-hand-src",
+  weight: "400",
+  display: "swap",
+  /*
+   * subsets 를 지정하지 않는다.
+   * 이 폰트는 next/font 타입에 'latin' 만 있어서 'korean' 을 넣으면 빌드가 막히고,
+   * 'latin' 만 받으면 한글 글자가 통째로 빠진다.
+   *
+   * 대신 preload 를 끄면 서브셋 없이 전체 CSS를 받아오고, 브라우저는
+   * 실제로 쓰는 글자가 든 조각만 내려받는다. 제목 몇 글자뿐이라 가볍다.
+   */
+  preload: false,
 });
 
 /**
@@ -44,7 +67,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${handwriting.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

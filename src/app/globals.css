@@ -52,6 +52,10 @@
     sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
+  /* 손글씨 — 제목·로고·연도에만 (DESIGN.md §3).
+     본문까지 손글씨로 하면 여러 줄 적었을 때 못 읽는다. */
+  --font-hand: var(--font-hand-src), var(--font-sans);
+
   /* 공책 한 줄의 높이. 체크리스트와 괘선 메모가 모두 이 값을 쓴다. */
   --spacing-line: 28px;
 }
