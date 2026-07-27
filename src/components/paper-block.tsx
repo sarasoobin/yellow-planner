@@ -235,12 +235,26 @@ export function PaperBlock({
     if (!root || !selection || selection.rangeCount === 0) return closeMenu()
 
     const node = selection.anchorNode
-    if (!node || !root.contains(node) || node.nodeType !== Node.TEXT_NODE) {
-      return closeMenu()
-    }
+    if (!node || !root.contains(node)) return closeMenu()
 
-    const text = node as Text
-    const offset = selection.anchorOffset
+    /*
+     * 커서가 글자 노드가 아니라 칸(div) 자체에 있을 때가 있다.
+     * 빈 줄이거나 방금 줄을 바꾼 직후가 그렇다.
+     * 그때는 커서 바로 앞 자식이 글자면 그걸 기준으로 삼는다.
+     */
+    let text: Text | null = null
+    let offset = selection.anchorOffset
+    if (node.nodeType === Node.TEXT_NODE) {
+      text = node as Text
+    } else {
+      const previous = node.childNodes[offset - 1]
+      if (previous && previous.nodeType === Node.TEXT_NODE) {
+        text = previous as Text
+        offset = text.data.length
+      }
+    }
+    if (!text) return closeMenu()
+
     const before = text.data.slice(0, offset)
     const slash = before.lastIndexOf('/')
 
@@ -251,8 +265,18 @@ export function PaperBlock({
     setQuery(before.slice(slash + 1))
     setActive(0)
 
-    const rect = selection.getRangeAt(0).getBoundingClientRect()
-    setMenuAt({ top: rect.bottom + 4, left: rect.left })
+    /*
+     * 커서만 있는 자리는 크기가 0인 사각형이 나오기도 한다.
+     * 그대로 쓰면 메뉴가 화면 왼쪽 위 구석에 뜬다. 그때는 그 줄을 기준으로 잡는다.
+     */
+    let rect = selection.getRangeAt(0).getBoundingClientRect()
+    if (!rect.height) {
+      rect = (text.parentElement ?? root).getBoundingClientRect()
+    }
+    setMenuAt({
+      top: Math.min(rect.bottom + 4, window.innerHeight - 240),
+      left: Math.min(rect.left, window.innerWidth - 190),
+    })
   }
 
   function handleInput() {
