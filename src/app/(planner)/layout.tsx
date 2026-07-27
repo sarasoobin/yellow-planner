@@ -29,8 +29,13 @@ export default async function PlannerLayout({
       {/* 다른 기기에서 적은 것을 화면 다시 볼 때 가져온다 */}
       <RefreshOnFocus />
 
-      <div className="min-h-full bg-desk px-3 py-4 md:px-6 md:py-10">
-        <div className="mx-auto flex w-full max-w-5xl items-stretch">
+      {/*
+        노트가 화면을 거의 채운다. 책상은 테두리처럼 조금만 남긴다.
+        1024px로 묶어두면 노트북에서 책상만 넓고 정작 달력 칸이 작아진다.
+        아주 넓은 화면에서 한 줄이 끝없이 길어지는 것만 막아 폭 상한을 둔다.
+      */}
+      <div className="min-h-dvh bg-desk px-2 py-3 md:px-5 md:py-6">
+        <div className="mx-auto flex w-full max-w-[1500px] items-stretch">
           {/* 노트 본체 */}
           <div className="flex min-w-0 flex-1 flex-col border border-edge bg-frame shadow-notebook">
             <IndexTabs orientation="top" currentYear={currentYear} />
@@ -67,7 +72,11 @@ export default async function PlannerLayout({
               배경색은 각 페이지가 정한다 (표지는 전체가 노란색이다).
             */}
             <div className="flex flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">
-              <main className="flex min-h-[560px] flex-1 flex-col border border-rule md:min-h-[700px]">
+              {/*
+                종이가 화면 높이를 채운다. 안쪽 여백·헤더·프레임을 뺀 만큼이다.
+                내용이 더 길어지면 그만큼 늘어나고 페이지가 스크롤된다.
+              */}
+              <main className="flex min-h-[560px] flex-1 flex-col border border-rule md:min-h-[calc(100dvh-7rem)]">
                 {children}
               </main>
             </div>

@@ -359,7 +359,11 @@ export function PaperBlock({
       <input type="hidden" name="style" value={JSON.stringify(style ?? {})} />
       <input ref={hiddenRef} type="hidden" name="content" defaultValue="" />
 
-      <div className="relative">
+      {/*
+        칸이 커지면 글 쓰는 자리도 같이 커진다.
+        안 그러면 칸은 큰데 눌러서 쓸 수 있는 곳은 위쪽 몇 줄뿐이다.
+      */}
+      <div className="relative flex flex-1 flex-col">
         <div
           ref={editorRef}
           contentEditable
@@ -396,7 +400,7 @@ export function PaperBlock({
             fontSize: `${fontSize}px`,
             backgroundImage: ruled ? ruledGradient(rowHeight) : undefined,
           }}
-          className="w-full break-words whitespace-pre-wrap outline-none"
+          className="w-full flex-1 break-words whitespace-pre-wrap outline-none"
         />
 
         {empty && placeholder && (

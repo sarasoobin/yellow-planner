@@ -88,7 +88,8 @@ export function IndexTabs({
   return (
     <nav
       aria-label="인덱스"
-      className="hidden shrink-0 flex-col gap-1 pt-10 md:flex"
+      // 페이지가 길어져도 탭은 화면에 붙어 따라온다
+      className="sticky top-6 hidden shrink-0 flex-col gap-1 self-start pt-10 md:flex"
     >
       {tabs.map((tab) => {
         const on = tab.key === active
