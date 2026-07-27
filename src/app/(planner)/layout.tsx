@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { signOut } from '@/lib/actions/auth'
 import { IndexTabs } from '@/components/index-tabs'
+import { RefreshOnFocus } from '@/components/refresh-on-focus'
 import { Toolbar, ToolProvider } from '@/components/toolbar'
 
 /**
@@ -25,6 +26,9 @@ export default async function PlannerLayout({
   return (
     // 도구는 헤더(고르는 곳)와 본문(적는 곳)이 함께 알아야 해서 둘을 같이 감싼다
     <ToolProvider>
+      {/* 다른 기기에서 적은 것을 화면 다시 볼 때 가져온다 */}
+      <RefreshOnFocus />
+
       <div className="min-h-full bg-desk px-3 py-4 md:px-6 md:py-10">
         <div className="mx-auto flex w-full max-w-5xl items-stretch">
           {/* 노트 본체 */}

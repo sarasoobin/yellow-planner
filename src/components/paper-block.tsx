@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useRef, useState, useSyncExternalStore } from 'react'
 import { saveBlock } from '@/lib/actions/items'
 import { PENS } from '@/components/toolbar'
 import { HIGHLIGHT } from '@/lib/stickers'
@@ -27,6 +27,31 @@ const CHECKED = '☑'
  * 칸마다 줄 간격이 달라서(달력 칸은 좁다) 클래스 대신 값으로 만든다.
  * CSS 변수를 인라인 style 의 "키"로 넘기면 React가 처리하지 못한다.
  */
+/**
+ * 좁은 화면인가.
+ *
+ * 폰에서는 꾸미기 메뉴를 커서 아래에 띄우면 키보드에 가려 안 보인다.
+ * 화면 위쪽에 고정해서 띄우려고 화면 폭을 본다.
+ *
+ * useEffect + setState 대신 useSyncExternalStore 를 쓴다.
+ * 첫 그림에서 이미 맞는 값이라 화면이 한 번 깜빡이지 않는다.
+ */
+const NARROW = '(max-width: 767px)'
+
+function subscribeNarrow(onChange: () => void) {
+  const query = window.matchMedia(NARROW)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+
+function useIsNarrow(): boolean {
+  return useSyncExternalStore(
+    subscribeNarrow,
+    () => window.matchMedia(NARROW).matches,
+    () => false, // 서버에서는 화면 폭을 알 수 없다. 넓은 쪽으로 그린다.
+  )
+}
+
 function ruledGradient(lineHeight: number): string {
   const rule = lineHeight - 6
   return [
@@ -170,6 +195,7 @@ export function PaperBlock({
 
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const saved = useRef(content)
+  const narrow = useIsNarrow()
 
   // `/` 가 시작된 자리. 메뉴에서 고르면 여기부터 커서까지를 지운다.
   const [slashAt, setSlashAt] = useState<number | null>(null)
@@ -322,8 +348,13 @@ export function PaperBlock({
         <ul
           role="listbox"
           aria-label="꾸미기"
-          style={{ top: `${(menuLine + 1) * rowHeight}px` }}
-          className="absolute left-0 z-30 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook"
+          // 폰에서는 커서 아래에 띄우면 키보드에 가린다. 화면 위쪽에 고정한다.
+          style={narrow ? undefined : { top: `${(menuLine + 1) * rowHeight}px` }}
+          className={
+            narrow
+              ? 'fixed top-3 left-1/2 z-50 max-h-[45vh] w-[min(18rem,90vw)] -translate-x-1/2 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook'
+              : 'absolute left-0 z-30 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook'
+          }
         >
           {matches.map((option, i) => (
             <li key={option.key}>
@@ -335,7 +366,8 @@ export function PaperBlock({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(option)}
                 onMouseEnter={() => setActive(i)}
-                className={`flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px] ${
+                // 폰에서는 손가락으로 눌러야 해서 칸을 넉넉히 준다
+                className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-[13px] md:px-2 md:py-1 md:text-[12px] ${
                   i === active ? 'bg-frame/60 text-ink' : 'text-ink-soft'
                 }`}
               >
