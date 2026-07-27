@@ -1,11 +1,10 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { DailyLine } from '@/components/daily-line'
-import { ItemList } from '@/components/item-list'
 import { NoteEditor } from '@/components/note-editor'
+import { PaperBlock } from '@/components/paper-block'
 import { StickerLayer } from '@/components/sticker-layer'
-import { Sticker, writtenStyle } from '@/components/written'
+import { EMPTY_BLOCK, blocksByDate, firstLine } from '@/lib/blocks'
 import {
   dayNumber,
   fromISODate,
@@ -67,20 +66,9 @@ export default async function WeekPage({ params }: Params) {
   // 스티커는 주 시작일에 붙는다. 페이지 하나에 한 묶음이다.
   const stickers = items.filter((i) => i.kind === 'sticker' && i.date === monday)
 
-  const eventsByDate = new Map<string, Item[]>()
-  const tasksByDate = new Map<string, Item[]>()
-  const dailyByDate = new Map<string, Item>()
-  for (const item of items) {
-    if (item.kind === 'sticker') continue
-    if (item.kind === 'daily') {
-      dailyByDate.set(item.date, item)
-      continue
-    }
-    const bucket = item.kind === 'event' ? eventsByDate : tasksByDate
-    const list = bucket.get(item.date) ?? []
-    list.push(item)
-    bucket.set(item.date, list)
-  }
+  const events = blocksByDate(items.filter((i) => i.kind === 'event'))
+  const tasks = blocksByDate(items.filter((i) => i.kind === 'task'))
+  const dailies = blocksByDate(items.filter((i) => i.kind === 'daily'))
 
   return (
     <StickerLayer
@@ -109,8 +97,10 @@ export default async function WeekPage({ params }: Params) {
         <div className="grid flex-1 grid-cols-1 md:grid-cols-7">
           {days.map((date, i) => {
             const isToday = date === today
-            const events = eventsByDate.get(date) ?? []
-            const tasks = tasksByDate.get(date) ?? []
+            const daily = dailies.get(date) ?? EMPTY_BLOCK
+            const task = tasks.get(date) ?? EMPTY_BLOCK
+            // 달력에 적은 그 날 가장 중요한 일정 — 여기선 보여주기만 한다
+            const headline = firstLine(events.get(date)?.content ?? '')
 
             return (
               <section
@@ -135,52 +125,46 @@ export default async function WeekPage({ params }: Params) {
                   >
                     {dayNumber(date)}
                   </span>
-                  <DailyLine
-                    item={dailyByDate.get(date)}
+                  <PaperBlock
+                    kind="daily"
                     date={date}
                     path={path}
+                    content={daily.content}
+                    color={daily.color}
+                    style={daily.style}
+                    minRows={1}
+                    lineHeight={16}
+                    fontSize={11}
+                    ruled={false}
+                    className="min-w-0 flex-1"
                   />
                 </div>
 
                 <div className="flex flex-1 flex-col px-1.5 pt-1 pb-2">
-                  {/* 달력에 적은 중요 일정이 올라온다. 여기선 고치지 않는다 */}
-                  {events.length > 0 && (
-                    <div className="mb-1 flex flex-col gap-0.5">
-                      {events.map((event) => (
-                        <div
-                          key={event.id}
-                          className="flex items-center gap-1 text-[12px] leading-tight"
-                          title={event.content}
-                        >
-                          <span
-                            aria-hidden
-                            className="h-3 w-[3px] shrink-0"
-                            style={{
-                              backgroundColor: event.color ?? '#C1453C',
-                            }}
-                          />
-                          <Sticker name={event.style?.sticker} />
-                          <span
-                            className="truncate"
-                            style={writtenStyle(
-                              event.color,
-                              event.style,
-                              event.is_done,
-                            )}
-                          >
-                            {event.content}
-                          </span>
-                        </div>
-                      ))}
+                  {headline && (
+                    <div className="mb-1 flex items-center gap-1.5 text-[12px] leading-tight font-semibold text-ink">
+                      <span
+                        aria-hidden
+                        className="h-3 w-[3px] shrink-0"
+                        style={{
+                          backgroundColor: events.get(date)?.color ?? '#C1453C',
+                        }}
+                      />
+                      <span className="truncate" title={headline}>
+                        {headline}
+                      </span>
                     </div>
                   )}
 
-                  <ItemList
-                    items={tasks}
+                  <PaperBlock
                     kind="task"
                     date={date}
                     path={path}
-                    minRows={11}
+                    content={task.content}
+                    color={task.color}
+                    style={task.style}
+                    minRows={10}
+                    className="flex-1"
                   />
                 </div>
               </section>

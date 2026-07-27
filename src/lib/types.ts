@@ -22,16 +22,18 @@ export const SIZES = {
 } as const
 export type SizeKey = keyof typeof SIZES
 
+/**
+ * 한 칸을 어떤 펜으로 적었는지.
+ *
+ * 체크박스는 여기 없다. 손으로 그리는 것이라 글 안에 ☐ / ☑ 글자로 들어간다.
+ * 그래서 줄 앞이든 문장 중간이든 아무 자리에나 그릴 수 있다.
+ */
 export type ItemStyle = {
   bold?: boolean
   italic?: boolean
   /** 형광펜 */
   highlight?: boolean
   size?: SizeKey
-  /** 체크박스를 그릴지. 없으면 kind별 기본값(defaultCheck) */
-  check?: boolean
-  /** 줄 앞에 붙는 스티커 이름. src/lib/stickers.ts 참고 */
-  sticker?: string | null
   /** kind='sticker' 일 때 붙인 자리. 페이지 크기 대비 % 라서 화면이 좁아져도 안 밀린다 */
   x?: number
   y?: number
@@ -39,16 +41,6 @@ export type ItemStyle = {
 
 /** Free Note 페이지에 붙인 스티커의 기준일. 실제 날짜와 겹치지 않는 자리표시자다. */
 export const FREE_NOTE_ANCHOR = '1970-01-01'
-
-/**
- * 체크박스를 기본으로 그릴지는 어디에 적느냐에 달렸다.
- *   올해 목표·주간 할 일 → 체크하는 것이라 네모가 있어야 한다
- *   이 달 메모·달력 일정·그날 한 줄 → 그냥 적는 것이라 네모가 없다
- * 줄마다 따로 켜고 끌 수 있다.
- */
-export function defaultCheck(kind: ItemKind): boolean {
-  return kind === 'year' || kind === 'task'
-}
 
 export type Item = {
   id: string

@@ -2,9 +2,16 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CalendarCell } from '@/components/calendar-cell'
-import { ItemList } from '@/components/item-list'
+import { PaperBlock } from '@/components/paper-block'
 import { StickerLayer } from '@/components/sticker-layer'
 import { TallyMark } from '@/components/tally-mark'
+import {
+  EMPTY_BLOCK,
+  blocksByDate,
+  countChecked,
+  countLines,
+  toBlock,
+} from '@/lib/blocks'
 import {
   WEEKDAY_LABELS,
   dayNumber,
@@ -41,8 +48,7 @@ export default async function MonthPage({ params }: Params) {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  // 달력에 그릴 것(일정·할일)과 왼쪽 단에 그릴 것(이 달 메모)을 한 번에 가져온다
-  const [{ data: calendarData }, { data: monthData }] = await Promise.all([
+  const [{ data: calendarData }, { data: asideData }] = await Promise.all([
     supabase
       .from('items')
       .select('*')
@@ -61,24 +67,13 @@ export default async function MonthPage({ params }: Params) {
   ])
 
   const calendarItems = (calendarData ?? []) as Item[]
-  const asideItems = (monthData ?? []) as Item[]
-  const monthItems = asideItems.filter((i) => i.kind === 'month')
+  const events = blocksByDate(calendarItems.filter((i) => i.kind === 'event'))
+  const tasks = blocksByDate(calendarItems.filter((i) => i.kind === 'task'))
+
+  const asideItems = (asideData ?? []) as Item[]
+  const memo = toBlock(asideItems.filter((i) => i.kind === 'month'))
   const stickers = asideItems.filter((i) => i.kind === 'sticker')
-
-  // 날짜별로 미리 묶어둔다. 칸마다 배열을 훑으면 칸 수 × 항목 수가 된다.
-  const eventsByDate = new Map<string, Item[]>()
-  const taskCountByDate = new Map<string, number>()
-  for (const item of calendarItems) {
-    if (item.kind === 'event') {
-      const list = eventsByDate.get(item.date) ?? []
-      list.push(item)
-      eventsByDate.set(item.date, list)
-    } else {
-      taskCountByDate.set(item.date, (taskCountByDate.get(item.date) ?? 0) + 1)
-    }
-  }
-
-  const monthDone = monthItems.filter((i) => i.is_done).length
+  const monthDone = countChecked(memo.content)
 
   return (
     <StickerLayer
@@ -91,12 +86,14 @@ export default async function MonthPage({ params }: Params) {
       <aside className="flex shrink-0 flex-col border-b border-rule bg-frame/30 px-3 py-4 md:w-40 md:border-r md:border-b-0">
         <h1 className="mb-3 text-2xl font-bold text-ink">{monthLabel(ym)}</h1>
 
-        {/* 그냥 메모장이다. 줄글을 주르륵 적고, 체크할 게 생기면 `/` 로 네모를 붙인다. */}
-        <ItemList
-          items={monthItems}
+        {/* 그냥 메모장이다. 체크할 게 생기면 `/` 로 네모를 그린다. */}
+        <PaperBlock
           kind="month"
           date={firstDay}
           path={path}
+          content={memo.content}
+          color={memo.color}
+          style={memo.style}
           minRows={12}
         />
 
@@ -140,8 +137,8 @@ export default async function MonthPage({ params }: Params) {
                   key={date}
                   date={date}
                   weekStart={week[0]}
-                  events={eventsByDate.get(date) ?? []}
-                  taskCount={taskCountByDate.get(date) ?? 0}
+                  block={events.get(date) ?? EMPTY_BLOCK}
+                  taskCount={countLines(tasks.get(date)?.content ?? '')}
                   isToday={date === today}
                   inMonth={isInMonth(date, ym)}
                   path={path}
@@ -152,7 +149,7 @@ export default async function MonthPage({ params }: Params) {
         </div>
 
         <p className="mt-2 text-[11px] text-ink-faint">
-          날짜 옆 줄이 그 날 가장 중요한 일정, 그 아래가 나머지입니다. 왼쪽{' '}
+          날짜 옆부터 바로 적으면 됩니다. 길어지면 다음 줄로 이어지고, 왼쪽{' '}
           <span className="text-accent">›</span> 나 날짜를 누르면 그 주의 주간
           페이지로 갑니다.
         </p>

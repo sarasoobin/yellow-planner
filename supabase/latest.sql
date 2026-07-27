@@ -60,7 +60,7 @@ create table if not exists public.items (
   kind       text not null,
   date       date not null,
 
-  content    text not null check (char_length(content) between 1 and 200),
+  content    text not null default '',
   is_done    boolean not null default false,
   color      text check (color is null or color ~ '^#[0-9A-Fa-f]{6}$'),
   sort_order integer not null default 0,
@@ -80,6 +80,12 @@ alter table public.items add constraint items_style_object
 alter table public.items drop constraint if exists items_kind_check;
 alter table public.items add constraint items_kind_check
   check (kind in ('year', 'month', 'event', 'task', 'daily', 'sticker'));
+
+-- 한 칸이 곧 종이 한 면이라 여러 줄이 통째로 들어온다.
+-- 예전엔 한 줄짜리라 200자로 묶어놨었다.
+alter table public.items drop constraint if exists items_content_check;
+alter table public.items add constraint items_content_check
+  check (char_length(content) <= 5000);
 
 create index if not exists items_user_kind_date_idx on public.items (user_id, kind, date);
 create index if not exists items_user_date_idx      on public.items (user_id, date);

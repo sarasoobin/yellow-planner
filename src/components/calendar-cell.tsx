@@ -1,30 +1,25 @@
 'use client'
 
-import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { deleteItem } from '@/lib/actions/items'
-import { LineEditor } from '@/components/item-list'
-import { Sticker, writtenStyle } from '@/components/written'
+import { PaperBlock } from '@/components/paper-block'
 import { dayNumber } from '@/lib/dates'
-import { lastLineOf, layoutLines } from '@/lib/lines'
-import type { Item } from '@/lib/types'
+import type { Block } from '@/lib/blocks'
 
 /**
  * 달력의 한 칸.
  *
- * 날짜 바로 옆 줄이 그 날 가장 중요한 일정이고, 그 아래 줄들이 나머지다.
- * 줄을 누르면 그 자리에서 바로 적힌다. 시험이나 마감은 체크하는 것이
- * 아니라 그냥 적는 것이라 네모를 두지 않는다 (`/` 로 붙일 수는 있다).
+ * 종이 플래너와 같다. 날짜 옆부터 적기 시작하고, 한 줄이 꽉 차면
+ * 다음 줄로 이어진다. 주제가 바뀌면 Enter로 줄을 바꾼다.
+ * 첫 줄이 자연스럽게 그 날 가장 중요한 일정이 된다.
  *
  * 날짜 숫자는 그 주의 주간 페이지로 가는 지름길이다.
  */
-
-const CELL_ROW = 'flex h-5 items-center gap-1'
+const CELL_LINE = 18
 
 export function CalendarCell({
   date,
   weekStart,
-  events,
+  block,
   taskCount,
   isToday,
   inMonth,
@@ -32,136 +27,59 @@ export function CalendarCell({
 }: {
   date: string
   weekStart: string
-  events: Item[]
+  block: Block
   taskCount: number
   isToday: boolean
   inMonth: boolean
   path: string
 }) {
-  const [active, setActive] = useState<number | null>(null)
-
-  const byLine = useMemo(() => layoutLines(events), [events])
-  const rows = Math.max(3, lastLineOf(byLine) + 2, (active ?? -1) + 2)
-
   return (
     <div
-      className={`group min-w-0 flex-1 border-r border-b border-rule px-1 py-0.5 ${
+      className={`group relative min-w-0 flex-1 border-r border-b border-rule px-1 pt-0.5 pb-1 ${
         inMonth ? '' : 'bg-desk/50'
       }`}
     >
-      {Array.from({ length: rows }, (_, line) => {
-        const item = byLine.get(line)
-        const first = line === 0
+      <Link
+        href={`/week/${weekStart}`}
+        aria-label={`${dayNumber(date)}일 주간 페이지로 이동`}
+        className={`absolute top-0.5 left-1 z-10 grid size-[18px] place-items-center rounded-full text-[12px] leading-none transition-colors ${
+          isToday
+            ? 'bg-today font-bold text-paper'
+            : inMonth
+              ? 'text-ink-soft hover:bg-frame/60'
+              : 'text-ink-faint/60'
+        }`}
+      >
+        {dayNumber(date)}
+      </Link>
 
-        return (
-          <div key={item?.id ?? `line-${line}`} className={CELL_ROW}>
-            {first ? (
-              <Link
-                href={`/week/${weekStart}`}
-                aria-label={`${dayNumber(date)}일 주간 페이지로 이동`}
-                className={`grid size-[19px] shrink-0 place-items-center rounded-full text-[12px] leading-none transition-colors ${
-                  isToday
-                    ? 'bg-today font-bold text-paper'
-                    : inMonth
-                      ? 'text-ink-soft hover:bg-frame/60'
-                      : 'text-ink-faint/60'
-                }`}
-              >
-                {dayNumber(date)}
-              </Link>
-            ) : (
-              <span aria-hidden className="size-[19px] shrink-0" />
-            )}
+      {/* 그 날 주간 페이지에 적어둔 자잘한 할 일 개수 */}
+      {taskCount > 0 && (
+        <span
+          className="absolute top-[7px] right-1 flex gap-[2px]"
+          aria-label={`할 일 ${taskCount}개`}
+        >
+          {Array.from({ length: Math.min(taskCount, 3) }, (_, i) => (
+            <span key={i} className="size-[3px] rounded-full bg-ink-faint" />
+          ))}
+        </span>
+      )}
 
-            {active === line ? (
-              <LineEditor
-                item={item}
-                line={line}
-                kind="event"
-                date={date}
-                path={path}
-                showBox={false}
-                className="text-[11px] leading-tight"
-                onNext={() => setActive(line + 1)}
-                onClose={() => setActive(null)}
-              />
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setActive(line)}
-                  aria-label={
-                    item
-                      ? item.content
-                      : first
-                        ? `${date} 가장 중요한 일정 적기`
-                        : `${date} 일정 적기`
-                  }
-                  className="flex min-w-0 flex-1 cursor-text items-center gap-1 self-stretch text-left"
-                >
-                  {item ? (
-                    <>
-                      <Sticker name={item.style?.sticker} />
-                      <span
-                        className="truncate text-[11px] leading-tight"
-                        // 첫 줄이 그 날의 대표라서 조금 더 진하게 둔다
-                        style={{
-                          ...writtenStyle(item.color, item.style, item.is_done),
-                          fontWeight:
-                            item.style?.bold || first ? 700 : undefined,
-                        }}
-                        title={item.content}
-                      >
-                        {item.content}
-                      </span>
-                    </>
-                  ) : (
-                    first &&
-                    taskCount === 0 && (
-                      <span
-                        aria-hidden
-                        className="text-[11px] leading-none text-transparent transition-colors group-hover:text-ink-faint/40"
-                      >
-                        +
-                      </span>
-                    )
-                  )}
-                </button>
-
-                {item ? (
-                  <form action={deleteItem} className="shrink-0">
-                    <input type="hidden" name="id" value={item.id} />
-                    <input type="hidden" name="path" value={path} />
-                    <button
-                      type="submit"
-                      aria-label={`${item.content} 삭제`}
-                      className="px-0.5 text-[10px] leading-none text-ink-faint/60 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
-                    >
-                      ✕
-                    </button>
-                  </form>
-                ) : (
-                  first &&
-                  taskCount > 0 && (
-                    // 그 날 주간 페이지에 적어둔 자잘한 할 일 개수
-                    <span
-                      className="flex shrink-0 gap-[2px] pr-0.5"
-                      aria-label={`할 일 ${taskCount}개`}
-                    >
-                      {Array.from({ length: Math.min(taskCount, 3) }, (_, i) => (
-                        <span
-                          key={i}
-                          className="size-[3px] rounded-full bg-ink-faint"
-                        />
-                      ))}
-                    </span>
-                  )
-                )}
-              </>
-            )}
-          </div>
-        )
-      })}
+      <PaperBlock
+        kind="event"
+        date={date}
+        path={path}
+        content={block.content}
+        color={block.color}
+        style={block.style}
+        minRows={3}
+        lineHeight={CELL_LINE}
+        fontSize={11}
+        ruled={false}
+        // 날짜 숫자를 피해 첫 줄만 들여쓴다. 길어지면 다음 줄은 왼쪽 끝부터.
+        firstLineIndent={22}
+        className="relative"
+      />
     </div>
   )
 }
