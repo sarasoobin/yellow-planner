@@ -13,15 +13,11 @@ import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
  * 이 앱은 웹이 아니라 종이다. 한 칸은 줄 목록이 아니라 그냥 글을 적는 자리다.
  * 마구잡이로 쓰고, Enter를 치면 줄이 바뀌고, 칸 끝에 닿으면 다음 줄로 넘어간다.
  *
- * textarea 가 아니라 contenteditable 을 쓴다.
- * 한 칸 안에서 "이 단어만" 굵게, "이 줄만" 빨갛게 하려면 글자마다 서식이
- * 달라야 하는데, textarea 는 통째로 한 가지 모양밖에 못 가진다.
- *
- * 서식은 브라우저 내장 편집 기능(execCommand)에 맡긴다. 오래된 API지만
- * 한글 입력(IME)과 선택 영역 처리를 직접 짜는 것보다 훨씬 안전하다.
- *
- * 체크박스는 손으로 그리는 것이라 글자로 넣는다 (☐ / ☑).
- * 줄 앞이든 문장 중간이든 커서가 있는 자리 어디에나 그릴 수 있다.
+ * 꾸미기는 두 갈래다. 둘이 하는 일이 다르다.
+ *   글자를 고르면 → 뜨는 막대로 그 부분만 바꾼다
+ *   그냥 `/`      → 그 뒤로 쓸 글자를 정한다 (펜을 바꿔 드는 것)
+ * `/` 로 고른 글자를 바꿀 수는 없다. `/` 를 치는 순간 고른 글자가 지워지고
+ * 그 자리에 `/` 가 들어가기 때문이다.
  */
 
 const BOX = '☐'
@@ -44,10 +40,7 @@ function useIsNarrow(): boolean {
   )
 }
 
-/**
- * 공책 괘선.
- * 칸마다 줄 간격이 달라서(달력 칸은 좁다) 클래스 대신 값으로 만든다.
- */
+/** 공책 괘선. 칸마다 줄 간격이 달라서 클래스 대신 값으로 만든다. */
 function ruledGradient(lineHeight: number): string {
   const rule = lineHeight - 6
   return [
@@ -79,14 +72,16 @@ const SIZE_LABELS: { key: SizeKey; label: string }[] = [
   { key: 'xl', label: '아주 크게' },
 ]
 
-const OPTIONS: Option[] = [
-  {
-    key: 'check',
-    label: '체크박스',
-    alias: 'checkbox todo box',
-    icon: <span className="text-[13px] leading-none">{BOX}</span>,
-    command: { kind: 'insert', text: `${BOX} ` },
-  },
+const CHECK_OPTION: Option = {
+  key: 'check',
+  label: '체크박스',
+  alias: 'checkbox todo box',
+  icon: <span className="text-[13px] leading-none">{BOX}</span>,
+  command: { kind: 'insert', text: `${BOX} ` },
+}
+
+/** 글자를 고른 뒤에도, 그냥 커서만 두고도 쓸 수 있는 것들 */
+const STYLE_OPTIONS: Option[] = [
   {
     key: 'bold',
     label: '굵게',
@@ -142,6 +137,8 @@ const OPTIONS: Option[] = [
   })),
 ]
 
+const OPTIONS: Option[] = [CHECK_OPTION, ...STYLE_OPTIONS]
+
 /** 고른 글자를 span 으로 감싸 크기를 준다. execCommand 의 fontSize 는 1~7 뿐이라 직접 한다. */
 function wrapFontSize(px: number) {
   const selection = window.getSelection()
@@ -160,6 +157,14 @@ function wrapFontSize(px: number) {
     selection.addRange(after)
   } catch {
     // 선택이 태그 경계를 어중간하게 걸친 경우. 크기만 안 걸리고 글은 그대로다.
+  }
+}
+
+/** 화면 밖으로 나가지 않게 가둔다 */
+function clamp(rect: DOMRect, width: number) {
+  return {
+    top: Math.max(Math.min(rect.bottom + 6, window.innerHeight - 60), 8),
+    left: Math.max(Math.min(rect.left, window.innerWidth - width - 8), 8),
   }
 }
 
@@ -202,7 +207,19 @@ export function PaperBlock({
 
   const editorRef = useRef<HTMLDivElement>(null)
   const hiddenRef = useRef<HTMLInputElement>(null)
-  const saved = useRef(content)
+  const saved = useRef<string | null>(null)
+
+  /*
+   * 처음 그릴 때의 내용을 붙들어두고 다시는 바꾸지 않는다.
+   *
+   * 저장할 때마다 서버가 새 내용을 내려주는데, 그걸 그대로 반영하면
+   * React가 칸 안을 통째로 다시 그린다. 그 순간 커서가 맨 앞으로 튀어서
+   * 방금 누른 체크박스를 지우려 해도 엉뚱한 곳이 지워졌다.
+   *
+   * 대신 다른 기기에서 고친 내용은 새로고침해야 보인다.
+   * 적고 있는 칸이 멋대로 바뀌지 않는 편이 훨씬 중요하다.
+   */
+  const initialHtml = useRef(toDisplayHtml(content)).current
 
   const [empty, setEmpty] = useState(() => isBlank(content))
   const [focused, setFocused] = useState(false)
@@ -212,6 +229,11 @@ export function PaperBlock({
   const [query, setQuery] = useState<string | null>(null)
   const [active, setActive] = useState(0)
   const [menuAt, setMenuAt] = useState({ top: 0, left: 0 })
+
+  // 글자를 골랐을 때 뜨는 막대
+  const [pickedAt, setPickedAt] = useState<{ top: number; left: number } | null>(
+    null,
+  )
 
   const matches =
     query === null
@@ -240,7 +262,6 @@ export function PaperBlock({
     /*
      * 커서가 글자 노드가 아니라 칸(div) 자체에 있을 때가 있다.
      * 빈 줄이거나 방금 줄을 바꾼 직후가 그렇다.
-     * 그때는 커서 바로 앞 자식이 글자면 그걸 기준으로 삼는다.
      */
     let text: Text | null = null
     let offset = selection.anchorOffset
@@ -265,24 +286,31 @@ export function PaperBlock({
     setQuery(before.slice(slash + 1))
     setActive(0)
 
-    /*
-     * 커서만 있는 자리는 크기가 0인 사각형이 나오기도 한다.
-     * 그대로 쓰면 메뉴가 화면 왼쪽 위 구석에 뜬다. 그때는 그 줄을 기준으로 잡는다.
-     */
+    // 커서만 있는 자리는 크기가 0인 사각형이 나오기도 한다. 그때는 그 줄을 기준으로.
     let rect = selection.getRangeAt(0).getBoundingClientRect()
-    if (!rect.height) {
-      rect = (text.parentElement ?? root).getBoundingClientRect()
+    if (!rect.height) rect = (text.parentElement ?? root).getBoundingClientRect()
+    setMenuAt(clamp(rect, 176))
+  }
+
+  /** 글자를 골랐는지 살펴 막대를 띄우거나 감춘다 */
+  function syncPicked() {
+    const root = editorRef.current
+    const selection = window.getSelection()
+    if (!root || !selection || selection.rangeCount === 0) {
+      return setPickedAt(null)
     }
-    setMenuAt({
-      top: Math.min(rect.bottom + 4, window.innerHeight - 240),
-      left: Math.min(rect.left, window.innerWidth - 190),
-    })
+    const range = selection.getRangeAt(0)
+    if (range.collapsed || !root.contains(range.commonAncestorContainer)) {
+      return setPickedAt(null)
+    }
+    setPickedAt(clamp(range.getBoundingClientRect(), 300))
   }
 
   function handleInput() {
     setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
+    setPickedAt(null)
     /*
-     * 일부 모바일 브라우저는 입력이 끝난 시점에 커서 위치를 아직 갱신하지 않는다.
+     * 일부 브라우저는 입력이 끝난 시점에 커서 위치를 아직 갱신하지 않는다.
      * 그대로 읽으면 "커서 앞에 아무것도 없다"고 나와 `/` 를 쳐도 안 열렸다.
      */
     requestAnimationFrame(syncMenu)
@@ -291,24 +319,28 @@ export function PaperBlock({
   function run(option: Option) {
     const root = editorRef.current
     if (!root) return
-    root.focus()
 
-    // `/명령어` 로 열었으면 그 글자부터 지운다
     const slash = slashRef.current
     if (slash) {
+      /*
+       * 입력한 `/명령어` 를 지운다.
+       * 글자를 직접 지우면(deleteData) 빈 글자 노드가 남아 브라우저가 정리해버리고,
+       * 그러면 곧바로 이어지는 서식 명령이 먹지 않았다. 지우는 것도 브라우저에 맡긴다.
+       */
       try {
-        slash.node.deleteData(slash.from, slash.to - slash.from)
         const range = document.createRange()
         range.setStart(slash.node, slash.from)
-        range.collapse(true)
+        range.setEnd(slash.node, slash.to)
         const selection = window.getSelection()
         selection?.removeAllRanges()
         selection?.addRange(range)
+        document.execCommand('delete')
       } catch {
         // 그 사이 글이 바뀌어 자리를 못 찾은 경우. 명령은 그대로 진행한다.
       }
     }
     closeMenu()
+    setPickedAt(null)
 
     // 서식을 태그가 아니라 style 로 남긴다. 저장할 때 걸러내기 쉽다.
     document.execCommand('styleWithCSS', false, 'true')
@@ -345,9 +377,12 @@ export function PaperBlock({
 
   /** 그려둔 네모를 누르면 체크한다 */
   function handleClick() {
+    syncPicked()
+
     const selection = window.getSelection()
     const node = selection?.anchorNode
     if (!node || node.nodeType !== Node.TEXT_NODE) return
+    if (!selection!.getRangeAt(0).collapsed) return
 
     const text = node as Text
     const offset = selection!.anchorOffset
@@ -373,6 +408,8 @@ export function PaperBlock({
 
   const rowHeight = lineHeight ?? 28
   const showMobileBar = narrow && focused
+  // 폰에서는 칸을 누르면 이미 막대가 떠 있다. 두 개가 겹치면 어지럽다.
+  const showPickedBar = pickedAt !== null && !narrow
 
   return (
     <form action={formAction} className={`relative flex flex-col ${className}`}>
@@ -389,7 +426,11 @@ export function PaperBlock({
       */}
       <div className="relative flex flex-1 flex-col">
         <div
-          ref={editorRef}
+          ref={(el) => {
+            editorRef.current = el
+            // 처음 붙을 때의 내용을 기준으로 잡는다. 안 바뀌었으면 저장하지 않는다.
+            if (el && saved.current === null) saved.current = el.innerHTML
+          }}
           contentEditable
           suppressContentEditableWarning
           role="textbox"
@@ -398,11 +439,14 @@ export function PaperBlock({
           spellCheck={false}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onKeyUp={syncPicked}
+          onMouseUp={syncPicked}
           onClick={handleClick}
           onFocus={() => setFocused(true)}
           onBlur={() => {
             setFocused(false)
             closeMenu()
+            setPickedAt(null)
             save()
           }}
           /*
@@ -415,7 +459,7 @@ export function PaperBlock({
             document.execCommand('insertText', false, text)
             setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
           }}
-          dangerouslySetInnerHTML={{ __html: toDisplayHtml(content) }}
+          dangerouslySetInnerHTML={{ __html: initialHtml }}
           style={{
             minHeight: `${minRows * rowHeight}px`,
             lineHeight: `${rowHeight}px`,
@@ -441,6 +485,31 @@ export function PaperBlock({
           </span>
         )}
       </div>
+
+      {/* 글자를 고르면 뜨는 막대 — 고른 부분만 바뀐다 */}
+      {showPickedBar && (
+        <div
+          role="toolbar"
+          aria-label="고른 글자 꾸미기"
+          style={{ top: `${pickedAt.top}px`, left: `${pickedAt.left}px` }}
+          className="fixed z-50 flex items-center gap-0.5 border border-rule bg-paper px-1 py-1 shadow-notebook"
+        >
+          {STYLE_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-label={option.label}
+              title={option.label}
+              // 누르는 순간 고른 글자가 풀리면 안 된다
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => run(option)}
+              className="grid size-7 cursor-pointer place-items-center rounded-[2px] text-ink-soft hover:bg-frame/70"
+            >
+              {option.icon}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 폰 — 화면 맨 위 꾸미기 줄. 키보드가 올라와도 가리지 않는다 */}
       {showMobileBar && (
@@ -474,7 +543,7 @@ export function PaperBlock({
         </div>
       )}
 
-      {/* 컴퓨터 — 커서 바로 아래. 칸이 좁아도 잘리지 않게 화면 기준으로 띄운다 */}
+      {/* 컴퓨터 — `/` 로 여는 메뉴. 그 뒤로 쓸 글자를 정한다 */}
       {slashOpen && !narrow && (
         <ul
           role="listbox"
