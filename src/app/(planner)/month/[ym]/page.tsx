@@ -82,8 +82,12 @@ export default async function MonthPage({ params }: Params) {
       path={path}
       className="flex flex-1 flex-col bg-paper md:flex-row"
     >
-      {/* 왼쪽 단 — 달력에 자리를 많이 내주려고 좁게 잡는다 */}
-      <aside className="flex shrink-0 flex-col border-b border-rule bg-frame/30 px-3 py-4 md:w-40 md:border-r md:border-b-0">
+      {/*
+        왼쪽 단 — 달력에 자리를 많이 내주려고 좁게 잡는다.
+        폰에서는 달력이 먼저 와야 한다 (DESIGN.md §6). 달을 열자마자
+        메모부터 보이면 달력을 보려고 스크롤을 내려야 한다.
+      */}
+      <aside className="order-2 flex shrink-0 flex-col border-t border-rule bg-frame/30 px-3 py-4 md:order-1 md:w-40 md:border-t-0 md:border-r">
         <h1 className="mb-3 text-2xl font-bold text-ink">{monthLabel(ym)}</h1>
 
         {/* 그냥 메모장이다. 체크할 게 생기면 `/` 로 네모를 그린다. */}
@@ -105,7 +109,7 @@ export default async function MonthPage({ params }: Params) {
       </aside>
 
       {/* 오른쪽 — 달력 */}
-      <div className="flex min-w-0 flex-1 flex-col px-3 py-4 md:px-4 md:py-4">
+      <div className="order-1 flex min-w-0 flex-1 flex-col px-3 py-4 md:order-2 md:px-4">
         <div className="mb-1 flex pl-7">
           {WEEKDAY_LABELS.map((label, i) => (
             <div
