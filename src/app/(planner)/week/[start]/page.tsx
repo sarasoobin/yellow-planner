@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { DailyLine } from '@/components/daily-line'
 import { ItemList } from '@/components/item-list'
 import { NoteEditor } from '@/components/note-editor'
+import { StickerLayer } from '@/components/sticker-layer'
 import { Sticker, writtenStyle } from '@/components/written'
 import {
   WEEKDAY_LABELS,
@@ -46,7 +47,7 @@ export default async function WeekPage({ params }: Params) {
     supabase
       .from('items')
       .select('*')
-      .in('kind', ['event', 'task', 'daily'])
+      .in('kind', ['event', 'task', 'daily', 'sticker'])
       .gte('date', days[0])
       .lte('date', days[6])
       .order('sort_order', { ascending: true })
@@ -61,11 +62,18 @@ export default async function WeekPage({ params }: Params) {
 
   const items = (itemData ?? []) as Item[]
 
+  // 스티커는 주 시작일에 붙는다. 페이지 하나에 한 묶음이다.
+  const stickers = items.filter(
+    (i) => i.kind === 'sticker' && i.date === monday,
+  )
+
   const eventsByDate = new Map<string, Item[]>()
   const tasksByDate = new Map<string, Item[]>()
   const dailyByDate = new Map<string, Item>()
   for (const item of items) {
-    if (item.kind === 'daily') {
+    if (item.kind === 'sticker') {
+      continue
+    } else if (item.kind === 'daily') {
       dailyByDate.set(item.date, item)
     } else {
       const bucket = item.kind === 'event' ? eventsByDate : tasksByDate
@@ -76,7 +84,12 @@ export default async function WeekPage({ params }: Params) {
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-paper px-3 py-3 md:px-4 md:py-4">
+    <StickerLayer
+      stickers={stickers}
+      date={monday}
+      path={path}
+      className="flex flex-1 flex-col bg-paper px-3 py-3 md:px-4 md:py-4"
+    >
       <header className="mb-2 flex items-baseline justify-between gap-3">
         <h1 className="text-base font-bold text-ink">
           {weekRangeLabel(monday)}
@@ -178,6 +191,6 @@ export default async function WeekPage({ params }: Params) {
           />
         </div>
       </div>
-    </div>
+    </StickerLayer>
   )
 }

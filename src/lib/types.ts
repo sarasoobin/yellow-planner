@@ -1,5 +1,12 @@
 /** items.kind — 어디에 적은 것인지 구분한다. DB의 check 제약과 값이 일치해야 한다. */
-export const ITEM_KINDS = ['year', 'month', 'event', 'task', 'daily'] as const
+export const ITEM_KINDS = [
+  'year',
+  'month',
+  'event',
+  'task',
+  'daily',
+  'sticker',
+] as const
 export type ItemKind = (typeof ITEM_KINDS)[number]
 
 /**
@@ -13,9 +20,15 @@ export type ItemStyle = {
   highlight?: boolean
   /** 체크박스를 그릴지. 없으면 kind별 기본값(defaultCheck) */
   check?: boolean
-  /** 스티커 이름. src/lib/stickers.ts 참고 */
+  /** 줄 앞에 붙는 스티커 이름. src/lib/stickers.ts 참고 */
   sticker?: string | null
+  /** kind='sticker' 일 때 붙인 자리. 페이지 크기 대비 % 라서 화면이 좁아져도 안 밀린다 */
+  x?: number
+  y?: number
 }
+
+/** Free Note 페이지에 붙인 스티커의 기준일. 실제 날짜와 겹치지 않는 자리표시자다. */
+export const FREE_NOTE_ANCHOR = '1970-01-01'
 
 /**
  * 체크박스를 기본으로 그릴지는 어디에 적느냐에 달렸다.

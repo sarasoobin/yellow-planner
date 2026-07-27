@@ -1,10 +1,16 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { HIGHLIGHT, STICKERS } from '@/lib/stickers'
-import { PENS, useTool } from '@/components/toolbar'
+import { HIGHLIGHT } from '@/lib/stickers'
+import { PENS } from '@/components/toolbar'
 import { Sticker, writtenStyle } from '@/components/written'
 import type { ItemStyle } from '@/lib/types'
+
+/** 아무것도 고르지 않았을 때의 기본 — 검정 펜, 꾸미기 없음 */
+export const DEFAULT_DRAFT: { color: string; style: ItemStyle } = {
+  color: PENS[0].hex,
+  style: {},
+}
 
 /**
  * 글을 적는 칸. 노션처럼 `/` 를 치면 꾸미기 메뉴가 뜬다.
@@ -92,23 +98,8 @@ function buildOptions(allowCheck: boolean): Option[] {
     })
   }
 
-  for (const sticker of STICKERS) {
-    options.push({
-      key: `sticker-${sticker.key}`,
-      label: `${sticker.label} 스티커`,
-      alias: `sticker ${sticker.key}`,
-      // eslint-disable-next-line @next/next/no-img-element
-      icon: <img src={sticker.src} alt="" className="size-3.5" />,
-      apply: (d) => ({
-        ...d,
-        style: {
-          ...d.style,
-          sticker: d.style.sticker === sticker.key ? null : sticker.key,
-        },
-      }),
-    })
-  }
-
+  // 스티커는 여기 없다. 위쪽 스티커 통에서 집어 아무 자리에나 붙인다.
+  // 같은 것을 두 군데서 고르게 하면 어느 쪽이 뭔지 헷갈린다.
   return options
 }
 
@@ -145,10 +136,7 @@ export function WritingInput({
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void
 }) {
-  const tool = useTool()
-  const [draft, setDraft] = useState<Draft>(
-    initial ?? { color: tool.hex, style: tool.style },
-  )
+  const [draft, setDraft] = useState<Draft>(initial ?? DEFAULT_DRAFT)
 
   const inputRef = useRef<HTMLInputElement>(null)
   // `/` 가 시작된 자리. 메뉴에서 고르면 여기부터 커서까지를 지운다.
@@ -234,10 +222,14 @@ export function WritingInput({
       <input type="hidden" name="color" value={draft.color} />
       <input type="hidden" name="style" value={JSON.stringify(draft.style)} />
 
-      {showBox && (
+      {/*
+        showBox 는 "네모 자리를 비워둘지"다. 자리를 안 비워두는 칸에서도
+        `/` 로 체크박스를 고르면 네모는 보여야 한다.
+      */}
+      {(showBox || draft.style.check) && (
         <span aria-hidden className="size-[13px] shrink-0">
           {draft.style.check && (
-            <span className="block size-[13px] border border-rule" />
+            <span className="block size-[13px] border border-ink-faint" />
           )}
         </span>
       )}

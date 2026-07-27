@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ItemList } from '@/components/item-list'
+import { StickerLayer } from '@/components/sticker-layer'
 import { TallyMark } from '@/components/tally-mark'
 import { yearFirstDay } from '@/lib/dates'
 import type { Item } from '@/lib/types'
@@ -20,20 +21,28 @@ export default async function CoverPage() {
   const year = new Date().getFullYear()
   const yearDate = yearFirstDay(year)
 
+  // 올해 목표와 이 페이지에 붙인 스티커를 한 번에 가져온다
   const { data } = await supabase
     .from('items')
     .select('*')
-    .eq('kind', 'year')
+    .in('kind', ['year', 'sticker'])
     .eq('date', yearDate)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
 
-  const items = (data ?? []) as Item[]
+  const all = (data ?? []) as Item[]
+  const items = all.filter((i) => i.kind === 'year')
+  const stickers = all.filter((i) => i.kind === 'sticker')
   const doneCount = items.filter((i) => i.is_done).length
 
   return (
     // 가운데는 다른 페이지와 같은 종이색. 노란 표지는 바깥 프레임이 맡는다.
-    <div className="flex flex-1 flex-col items-center justify-center bg-paper px-6 py-12">
+    <StickerLayer
+      stickers={stickers}
+      date={yearDate}
+      path="/cover"
+      className="flex flex-1 flex-col items-center justify-center bg-paper px-6 py-12"
+    >
       <p className="text-6xl leading-none font-bold tracking-tight text-ink md:text-7xl">
         {year}
       </p>
@@ -64,6 +73,6 @@ export default async function CoverPage() {
           </div>
         )}
       </div>
-    </div>
+    </StickerLayer>
   )
 }

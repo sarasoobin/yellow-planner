@@ -3,8 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { createItem, deleteItem } from '@/lib/actions/items'
-import { useTool } from '@/components/toolbar'
-import { WritingInput } from '@/components/writing-input'
+import { DEFAULT_DRAFT, WritingInput } from '@/components/writing-input'
 import { Sticker, writtenStyle } from '@/components/written'
 import { dayNumber } from '@/lib/dates'
 import type { FormState, Item } from '@/lib/types'
@@ -37,7 +36,6 @@ export function CalendarCell({
 }) {
   const [writing, setWriting] = useState(false)
   const [state, formAction] = useActionState(createItem, EMPTY)
-  const { hex, style } = useTool()
   const formRef = useRef<HTMLFormElement>(null)
   const handled = useRef<FormState | null>(null)
 
@@ -87,9 +85,8 @@ export function CalendarCell({
             <input type="hidden" name="path" value={path} />
 
             <WritingInput
-              key={`${hex}-${JSON.stringify(style)}`}
               // 달력 일정은 기본이 체크리스트가 아니다. `/` 로 붙일 수는 있다.
-              initial={{ color: hex, style: { ...style, check: false } }}
+              initial={{ color: DEFAULT_DRAFT.color, style: { check: false } }}
               ariaLabel={`${date} 일정`}
               autoFocus
               onKeyDown={(e) => {

@@ -44,7 +44,23 @@ const STYLE = z.object({
   highlight: z.boolean().optional(),
   check: z.boolean().optional(),
   sticker: z.string().max(32).nullable().optional(),
+  x: z.number().min(0).max(100).optional(),
+  y: z.number().min(0).max(100).optional(),
 })
+
+/**
+ * DB가 돌려준 오류를 사람이 읽을 수 있는 문장으로 바꾼다.
+ *
+ * 42703 = 없는 컬럼, 23514 = check 제약 위반.
+ * 둘 다 "코드는 새 기능인데 DB가 아직 옛날"일 때 나온다.
+ * 이 경우엔 무엇을 해야 하는지 딱 집어줘야 한다.
+ */
+function dbError(error: { code?: string } | null, fallback: string): string {
+  if (error?.code === '42703' || error?.code === '23514') {
+    return 'DB가 최신이 아닙니다. supabase/latest.sql 을 Supabase SQL Editor에서 실행해주세요.'
+  }
+  return fallback
+}
 
 function parseStyle(raw: FormDataEntryValue | null): ItemStyle {
   if (typeof raw !== 'string' || !raw) return {}
@@ -101,7 +117,11 @@ export async function createItem(
     style: parseStyle(formData.get('style')),
   })
 
-  if (error) return { error: '저장하지 못했습니다. 잠시 후 다시 시도해주세요.' }
+  if (error) {
+    return {
+      error: dbError(error, '저장하지 못했습니다. 잠시 후 다시 시도해주세요.'),
+    }
+  }
 
   revalidateFrom(formData)
   return { error: null }
@@ -138,10 +158,58 @@ export async function updateItem(
   const supabase = await createClient()
   const { error } = await supabase.from('items').update(patch).eq('id', id)
 
-  if (error) return { error: '수정하지 못했습니다.' }
+  if (error) return { error: dbError(error, '수정하지 못했습니다.') }
 
   revalidateFrom(formData)
   return { error: null }
+}
+
+/** 붙인 자리. 페이지 크기 대비 %라서 창을 줄여도 제자리에 남는다. */
+const SPOT = z.object({
+  x: z.coerce.number().min(0).max(100),
+  y: z.coerce.number().min(0).max(100),
+})
+
+/** 페이지 아무 데나 스티커를 붙인다. */
+export async function placeSticker(formData: FormData) {
+  const sticker = String(formData.get('sticker') ?? '')
+  const date = DATE.safeParse(formData.get('date'))
+  const spot = SPOT.safeParse({
+    x: formData.get('x'),
+    y: formData.get('y'),
+  })
+  if (!sticker || !date.success || !spot.success) return
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase.from('items').insert({
+    kind: 'sticker',
+    date: date.data,
+    content: sticker,
+    user_id: user.id,
+    style: spot.data,
+  })
+
+  revalidateFrom(formData)
+}
+
+/** 붙여둔 스티커를 끌어서 옮긴다. */
+export async function moveSticker(formData: FormData) {
+  const id = String(formData.get('id') ?? '')
+  const spot = SPOT.safeParse({
+    x: formData.get('x'),
+    y: formData.get('y'),
+  })
+  if (!id || !spot.success) return
+
+  const supabase = await createClient()
+  await supabase.from('items').update({ style: spot.data }).eq('id', id)
+
+  revalidateFrom(formData)
 }
 
 /**
@@ -229,7 +297,7 @@ export async function saveDaily(
       .from('items')
       .update({ content, color, style })
       .eq('id', id)
-    if (error) return { error: '저장하지 못했습니다.' }
+    if (error) return { error: dbError(error, '저장하지 못했습니다.') }
   } else {
     const {
       data: { user },
@@ -244,7 +312,7 @@ export async function saveDaily(
       style,
       user_id: user.id,
     })
-    if (error) return { error: '저장하지 못했습니다.' }
+    if (error) return { error: dbError(error, '저장하지 못했습니다.') }
   }
 
   revalidateFrom(formData)

@@ -2,8 +2,7 @@
 
 import { useActionState } from 'react'
 import { saveDaily } from '@/lib/actions/items'
-import { useTool } from '@/components/toolbar'
-import { WritingInput } from '@/components/writing-input'
+import { DEFAULT_DRAFT, WritingInput } from '@/components/writing-input'
 import type { FormState, Item } from '@/lib/types'
 
 const EMPTY: FormState = { error: null }
@@ -25,11 +24,10 @@ export function DailyLine({
   path: string
 }) {
   const [state, formAction] = useActionState(saveDaily, EMPTY)
-  const tool = useTool()
   const saved = item?.content ?? ''
-  // 이미 적힌 줄은 그때 쓴 도구를 지키고, 새로 적을 때는 지금 쥔 도구를 쓴다
-  const hex = item?.color ?? tool.hex
-  const style = item?.style ?? tool.style
+  // 이미 적힌 줄은 그때 쓴 도구를 지킨다. 새로 적을 때는 기본값에서 시작한다.
+  const hex = item?.color ?? DEFAULT_DRAFT.color
+  const style = item?.style ?? DEFAULT_DRAFT.style
 
   return (
     <form action={formAction} className="flex min-w-0 flex-1">

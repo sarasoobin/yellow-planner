@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { CalendarCell } from '@/components/calendar-cell'
 import { ItemList } from '@/components/item-list'
+import { StickerLayer } from '@/components/sticker-layer'
 import { TallyMark } from '@/components/tally-mark'
 import {
   WEEKDAY_LABELS,
@@ -53,14 +54,16 @@ export default async function MonthPage({ params }: Params) {
     supabase
       .from('items')
       .select('*')
-      .eq('kind', 'month')
+      .in('kind', ['month', 'sticker'])
       .eq('date', firstDay)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true }),
   ])
 
   const calendarItems = (calendarData ?? []) as Item[]
-  const monthItems = (monthData ?? []) as Item[]
+  const asideItems = (monthData ?? []) as Item[]
+  const monthItems = asideItems.filter((i) => i.kind === 'month')
+  const stickers = asideItems.filter((i) => i.kind === 'sticker')
 
   // 날짜별로 미리 묶어둔다. 칸마다 배열을 훑으면 칸 수 × 항목 수가 된다.
   const eventsByDate = new Map<string, Item[]>()
@@ -78,7 +81,12 @@ export default async function MonthPage({ params }: Params) {
   const monthDone = monthItems.filter((i) => i.is_done).length
 
   return (
-    <div className="flex flex-1 flex-col bg-paper md:flex-row">
+    <StickerLayer
+      stickers={stickers}
+      date={firstDay}
+      path={path}
+      className="flex flex-1 flex-col bg-paper md:flex-row"
+    >
       {/* 왼쪽 단 — 달력에 자리를 많이 내주려고 좁게 잡는다 */}
       <aside className="flex shrink-0 flex-col border-b border-rule bg-frame/30 px-3 py-4 md:w-40 md:border-r md:border-b-0">
         <h1 className="mb-3 text-2xl font-bold text-ink">{monthLabel(ym)}</h1>
@@ -149,6 +157,6 @@ export default async function MonthPage({ params }: Params) {
           페이지로 갑니다.
         </p>
       </div>
-    </div>
+    </StickerLayer>
   )
 }

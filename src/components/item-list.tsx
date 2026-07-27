@@ -9,8 +9,7 @@ import {
   toggleItem,
   updateItem,
 } from '@/lib/actions/items'
-import { useTool } from '@/components/toolbar'
-import { WritingInput } from '@/components/writing-input'
+import { DEFAULT_DRAFT, WritingInput } from '@/components/writing-input'
 import { CheckMark, Sticker, writtenStyle } from '@/components/written'
 import {
   defaultCheck,
@@ -169,14 +168,13 @@ function AddItemForm({
   placeholder,
 }: Pick<Props, 'kind' | 'date' | 'path'> & { placeholder: string }) {
   const [state, formAction, pending] = useActionState(createItem, EMPTY)
-  const { hex, style } = useTool()
   const formRef = useRef<HTMLFormElement>(null)
   const handled = useRef<FormState | null>(null)
 
   // 새 줄에 네모를 그릴지는 어디에 적느냐로 정한다. `/` 로 줄마다 바꿀 수 있다.
   const initial = {
-    color: hex,
-    style: { ...style, check: defaultCheck(kind) },
+    color: DEFAULT_DRAFT.color,
+    style: { check: defaultCheck(kind) },
   }
 
   // 저장에 성공하면 입력칸을 비워 다음 줄을 바로 적을 수 있게 한다
@@ -201,8 +199,6 @@ function AddItemForm({
       <input type="hidden" name="path" value={path} />
 
       <WritingInput
-        // 도구 막대를 건드리면 기본값이 바뀌어야 하니 다시 만들게 한다
-        key={`${hex}-${JSON.stringify(style)}`}
         initial={initial}
         placeholder={placeholder}
         ariaLabel={placeholder || '새 항목'}
