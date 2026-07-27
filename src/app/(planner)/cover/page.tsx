@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { signOut } from '@/lib/actions/auth'
 import { ItemList } from '@/components/item-list'
+import { TallyMark } from '@/components/tally-mark'
+import { yearFirstDay } from '@/lib/dates'
 import type { Item } from '@/lib/types'
 
 export const metadata = {
@@ -17,8 +18,7 @@ export default async function CoverPage() {
   if (!user) return null
 
   const year = new Date().getFullYear()
-  // 연간 목표는 그 해 1월 1일로 저장한다 (schema.sql 주석 참고)
-  const yearDate = `${year}-01-01`
+  const yearDate = yearFirstDay(year)
 
   const { data } = await supabase
     .from('items')
@@ -32,26 +32,23 @@ export default async function CoverPage() {
   const doneCount = items.filter((i) => i.is_done).length
 
   return (
-    <main className="mx-auto w-full max-w-2xl p-6">
-      <header className="mb-10 flex items-center justify-between">
-        <h1 className="text-xl font-bold">正 PLANNER</h1>
-        <form action={signOut}>
-          <button className="text-sm text-neutral-500 underline underline-offset-4">
-            로그아웃
-          </button>
-        </form>
-      </header>
-
-      <p className="mb-1 text-5xl font-bold tracking-tight">{year}</p>
-      <p className="mb-8 text-sm text-neutral-500">
-        {user.email}
-        {items.length > 0 && ` · ${items.length}개 중 ${doneCount}개 달성`}
+    <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-14 md:py-20">
+      <p className="text-6xl leading-none font-bold tracking-tight text-ink md:text-7xl">
+        {year}
       </p>
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-neutral-500">
-          올해의 목표
-        </h2>
+      <div className="mt-10 w-full max-w-md">
+        <div className="mb-3 flex items-baseline justify-between border-b border-rule pb-2">
+          <h1 className="text-sm font-semibold tracking-[0.08em] text-ink">
+            올해의 목표
+          </h1>
+          {items.length > 0 && (
+            <span className="text-xs text-ink-faint">
+              {items.length}개 중 {doneCount}개 달성
+            </span>
+          )}
+        </div>
+
         <ItemList
           items={items}
           kind="year"
@@ -60,7 +57,13 @@ export default async function CoverPage() {
           placeholder="올해 이루고 싶은 걸 적어보세요"
           emptyText="아직 적은 목표가 없습니다."
         />
-      </section>
-    </main>
+
+        {doneCount > 0 && (
+          <div className="mt-8 flex justify-center">
+            <TallyMark count={doneCount} />
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

@@ -31,9 +31,9 @@ export function ItemList({
   emptyText,
 }: Props) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1">
       {items.length === 0 && emptyText && (
-        <p className="py-2 text-sm text-neutral-400">{emptyText}</p>
+        <p className="py-1 text-sm text-ink-faint">{emptyText}</p>
       )}
 
       <ul className="flex flex-col">
@@ -80,7 +80,7 @@ function AddItemForm({
       <input type="hidden" name="path" value={path} />
 
       <div className="flex items-center gap-2">
-        <span aria-hidden className="text-neutral-300">
+        <span aria-hidden className="text-sm text-ink-faint/60">
           +
         </span>
         <input
@@ -90,12 +90,12 @@ function AddItemForm({
           placeholder={placeholder}
           aria-label={placeholder}
           disabled={pending}
-          className="w-full border-b border-transparent bg-transparent py-1 text-sm outline-none placeholder:text-neutral-300 focus:border-neutral-400 disabled:opacity-50"
+          className="w-full border-b border-transparent bg-transparent py-1 text-sm text-ink-soft outline-none placeholder:text-ink-faint/70 focus:border-accent disabled:opacity-50"
         />
       </div>
 
       {state.error && (
-        <p role="alert" className="pl-5 text-xs text-red-600">
+        <p role="alert" className="pl-5 text-xs text-danger">
           {state.error}
         </p>
       )}
@@ -107,7 +107,7 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
   const [editing, setEditing] = useState(false)
 
   return (
-    <li className="group flex items-center gap-2 border-b border-neutral-100 py-1">
+    <li className="group flex items-center gap-2 border-b border-rule/60 py-1">
       {/* 완료 토글 */}
       <form action={toggleItem} className="flex">
         <input type="hidden" name="id" value={item.id} />
@@ -117,7 +117,7 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
           type="submit"
           aria-pressed={item.is_done}
           aria-label={`${item.content} ${item.is_done ? '완료 취소' : '완료'}`}
-          className="grid size-4 shrink-0 place-items-center border border-neutral-400 text-[10px] leading-none"
+          className="grid size-[15px] shrink-0 cursor-pointer place-items-center border border-rule text-[10px] leading-none text-done transition-colors hover:border-done"
         >
           {item.is_done ? '✓' : ''}
         </button>
@@ -134,8 +134,8 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className={`flex-1 truncate text-left text-sm ${
-              item.is_done ? 'text-neutral-400 line-through' : ''
+            className={`flex-1 cursor-text truncate text-left text-sm ${
+              item.is_done ? 'text-ink-faint line-through' : 'text-ink-soft'
             }`}
           >
             {item.content}
@@ -147,7 +147,7 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
             <button
               type="submit"
               aria-label={`${item.content} 삭제`}
-              className="px-1 text-xs text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:text-red-600"
+              className="cursor-pointer px-1 text-xs text-ink-faint/60 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger focus:opacity-100"
             >
               ✕
             </button>
@@ -181,7 +181,7 @@ function EditItemForm({
   }, [state, onDone])
 
   return (
-    <form action={formAction} className="flex flex-1 items-center gap-2">
+    <form action={formAction} className="flex flex-1 items-center gap-1.5">
       <input type="hidden" name="id" value={item.id} />
       <input type="hidden" name="path" value={path} />
       <input
@@ -194,20 +194,23 @@ function EditItemForm({
         onKeyDown={(e) => {
           if (e.key === 'Escape') onDone()
         }}
-        className="flex-1 border-b border-neutral-400 bg-transparent py-1 text-sm outline-none"
+        className="min-w-0 flex-1 border-b border-accent bg-transparent py-1 text-sm text-ink outline-none"
       />
-      <button type="submit" className="text-xs text-neutral-500">
+      <button
+        type="submit"
+        className="shrink-0 cursor-pointer text-xs text-accent"
+      >
         저장
       </button>
       <button
         type="button"
         onClick={onDone}
-        className="text-xs text-neutral-400"
+        className="shrink-0 cursor-pointer text-xs text-ink-faint"
       >
         취소
       </button>
       {state.error && (
-        <span role="alert" className="text-xs text-red-600">
+        <span role="alert" className="text-xs text-danger">
           {state.error}
         </span>
       )}

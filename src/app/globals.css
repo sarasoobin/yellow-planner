@@ -1,26 +1,60 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * DESIGN.md §2의 색을 Tailwind 토큰으로 등록한다.
+ * 여기 등록하면 bg-paper, text-ink, border-rule 처럼 바로 쓸 수 있다.
+ * 다크모드는 만들지 않는다 — 종이 노트 컨셉과 충돌한다 (DESIGN.md §2).
+ */
+@theme {
+  /* 기본 */
+  --color-desk: #f5f4f1; /* 책상 — 노트 바깥 */
+  --color-frame: #f0e3a0; /* 노트 표지 — 노란 프레임 */
+  --color-edge: #e0ce72; /* 프레임 테두리 */
+  --color-paper: #fffdf0; /* 종이 — 내용이 올라가는 면 */
+  --color-rule: #d8cda8; /* 괘선·칸 구분선 */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-ink: #3d3527; /* 제목 */
+  --color-ink-soft: #5c5344; /* 본문 */
+  --color-ink-faint: #948a75; /* 보조·날짜 */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* 강조 */
+  --color-accent: #8b6f3d; /* 버튼·활성 */
+  --color-today: #c1453c; /* 오늘 (빨간펜) */
+  --color-done: #6b8e5a; /* 완료 체크 */
+  --color-danger: #b23b32; /* 삭제·위험 */
+
+  /* Geist에는 한글이 없어 뒤의 한글 폰트로 자연스럽게 넘어간다.
+     손글씨 폰트는 Day 3에 제목·로고에만 적용한다 (DESIGN.md §3). */
+  --font-sans:
+    var(--font-geist-sans), "Pretendard Variable", Pretendard, -apple-system,
+    BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", system-ui,
+    sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* 종이는 각지다 — 라운드는 거의 주지 않는다 (DESIGN.md §4) */
+  --radius-paper: 4px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-desk);
+  color: var(--color-ink-soft);
+}
+
+/* 노트가 책상 위에 놓인 느낌. 그림자는 아주 옅게만 (DESIGN.md §4) */
+@utility shadow-notebook {
+  box-shadow:
+    0 1px 2px rgba(61, 53, 39, 0.08),
+    0 10px 30px rgba(61, 53, 39, 0.07);
+}
+
+/* 공책 괘선. 줄 간격과 line-height를 맞춰야 글자가 줄 위에 앉는다. */
+@utility ruled {
+  line-height: 32px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    var(--color-rule) 31px,
+    var(--color-rule) 32px
+  );
 }

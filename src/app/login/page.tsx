@@ -13,8 +13,13 @@ export default async function LoginPage({
   const { next } = await searchParams
 
   return (
-    <main className="flex min-h-dvh items-center justify-center p-6">
-      <LoginForm next={next ?? '/cover'} />
+    <main className="flex min-h-dvh items-center justify-center bg-desk p-6">
+      {/* 노트 표지를 펼친 느낌 — 노란 프레임 안에 종이 한 장 */}
+      <div className="w-full max-w-md border border-edge bg-frame p-2 shadow-notebook">
+        <div className="border border-rule bg-paper px-6 py-10 md:px-9">
+          <LoginForm next={next ?? '/cover'} />
+        </div>
+      </div>
     </main>
   )
 }
