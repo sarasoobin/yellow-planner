@@ -84,6 +84,34 @@ export async function signUp(
   redirect(safeNext(formData.get('next')))
 }
 
+/**
+ * 데모 계정으로 바로 들어간다.
+ *
+ * 둘러보러 온 사람에게 가입부터 시키면 대부분 그냥 닫는다.
+ * 채워진 노트를 먼저 보여주려는 것이다.
+ *
+ * 비밀번호는 DEMO_PASSWORD 로 서버에만 둔다. NEXT_PUBLIC_ 을 붙이면
+ * 브라우저 번들에 그대로 박혀 나간다. 로그인은 이 서버 액션 안에서만 일어난다.
+ */
+export async function signInDemo() {
+  const email = process.env.DEMO_EMAIL
+  const password = process.env.DEMO_PASSWORD
+
+  if (!email || !password) {
+    redirect('/login?demo=off')
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (error) {
+    redirect('/login?demo=failed')
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/cover')
+}
+
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()

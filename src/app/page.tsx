@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DemoButton } from '@/components/demo-button'
 
 export default function LandingPage() {
   return (
@@ -17,12 +18,16 @@ export default function LandingPage() {
         </p>
       </div>
 
-      <Link
-        href="/login"
-        className="bg-accent px-6 py-2.5 text-sm font-semibold text-paper transition-opacity hover:opacity-90"
-      >
-        시작하기
-      </Link>
+      <div className="flex flex-col items-center gap-3">
+        {/* 가입 전에 먼저 보여준다. 빈 화면보다 채워진 노트가 설명을 대신한다 */}
+        <DemoButton />
+        <Link
+          href="/login"
+          className="text-sm text-ink-faint underline underline-offset-4 transition-colors hover:text-accent"
+        >
+          내 노트 만들기
+        </Link>
+      </div>
     </main>
   )
 }

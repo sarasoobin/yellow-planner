@@ -2,7 +2,8 @@
 
 **중요한 일정과 자잘한 할 일을 서로 다른 페이지에 적는 웹 다이어리**
 
-🔗 **[yellow-planner.vercel.app](https://yellow-planner.vercel.app)**
+🔗 **[yellow-planner.vercel.app](https://yellow-planner.vercel.app)** — 첫 화면의
+**"데모 계정으로 둘러보기"** 를 누르면 가입 없이 채워진 노트를 볼 수 있습니다.
 
 > 🚧 **개발 중 (Day 1/3)** — 현재 로그인과 표지 페이지가 동작합니다.
 > 월간 · 주간 페이지는 Day 2에 추가됩니다. 진행 상황은 [CHANGELOG.md](CHANGELOG.md)를 참고하세요.
@@ -117,11 +118,17 @@ npm install
 NEXT_PUBLIC_SUPABASE_URL=https://<프로젝트-id>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# 데모 계정 (선택) — 없으면 "둘러보기" 버튼만 안내 문구를 띄웁니다
+DEMO_EMAIL=demo@yellow-planner.app
+DEMO_PASSWORD=...
 ```
 
 > `service_role` / Secret key는 **RLS를 무시**합니다. 절대 코드나 `.env`에 넣지 마세요.
+> `DEMO_PASSWORD` 에 `NEXT_PUBLIC_` 을 붙이면 브라우저 번들에 그대로 박혀 나갑니다.
+> 데모 로그인은 서버 액션 안에서만 일어납니다.
 
-Supabase SQL Editor에서 [`supabase/schema.sql`](supabase/schema.sql)을 실행해 테이블과 정책을 만든 뒤:
+Supabase SQL Editor에서 [`supabase/latest.sql`](supabase/latest.sql)을 실행해 테이블과 정책을 만든 뒤:
 
 ```bash
 npm run dev
