@@ -1,24 +1,33 @@
 @import "tailwindcss";
 
-/*
- * DESIGN.md §2의 색을 Tailwind 토큰으로 등록한다.
- * 여기 등록하면 bg-paper, text-ink, border-rule 처럼 바로 쓸 수 있다.
- * 다크모드는 만들지 않는다 — 종이 노트 컨셉과 충돌한다 (DESIGN.md §2).
- */
+/* ═══════════════════════════════════════════════════════════════
+ *  🎨 색은 전부 여기서 고칩니다. 저장하면 앱 전체에 바로 반영됩니다.
+ *
+ *  노란색 후보 — 마음에 드는 값을 --color-frame 에 넣어보세요.
+ *    #FDE68A  버터    ← 지금 이 색. 따뜻하고 부드러움
+ *    #FFE066  병아리  더 쨍하고 귀여움
+ *    #FFF0A5  레몬크림 더 연하고 은은함
+ *    #F7DE8B  살구노랑 살짝 주황빛
+ *    #F0E3A0  머스터드 처음 쓰던 색 (좀 칙칙함)
+ *
+ *  --color-frame 을 바꾸면 --color-edge(테두리)도 같이 손보세요.
+ *  테두리는 프레임보다 한 톤 진한 색이면 됩니다.
+ * ═══════════════════════════════════════════════════════════════ */
 @theme {
-  /* 기본 */
-  --color-desk: #f5f4f1; /* 책상 — 노트 바깥 */
-  --color-frame: #f0e3a0; /* 노트 표지 — 노란 프레임 */
-  --color-edge: #e0ce72; /* 프레임 테두리 */
-  --color-paper: #fffdf0; /* 종이 — 내용이 올라가는 면 */
-  --color-rule: #d8cda8; /* 괘선·칸 구분선 */
+  /* 노트 */
+  --color-frame: #FFFF00 ; /* 노트 표지 — 표지 페이지 전체, 프레임, 헤더 */
+  --color-edge: #edc85c; /* 프레임 테두리 — frame보다 한 톤 진하게 */
+  --color-paper: #fffdf4; /* 종이 — 달력·주간칸이 올라가는 면 */
+  --color-desk: #f4f2ed; /* 책상 — 노트 바깥 배경 */
+  --color-rule: #e4dac0; /* 괘선·칸 구분선 */
 
-  --color-ink: #3d3527; /* 제목 */
-  --color-ink-soft: #5c5344; /* 본문 */
-  --color-ink-faint: #948a75; /* 보조·날짜 */
+  /* 글자 */
+  --color-ink: #3a3226; /* 제목 */
+  --color-ink-soft: #5a5145; /* 본문 */
+  --color-ink-faint: #9a9080; /* 보조·날짜 */
 
   /* 강조 */
-  --color-accent: #8b6f3d; /* 버튼·활성 */
+  --color-accent: #8b6f3d; /* 버튼·활성 (노란 배경 위에서도 보이는 갈색) */
   --color-today: #c1453c; /* 오늘 (빨간펜) */
   --color-done: #6b8e5a; /* 완료 체크 */
   --color-danger: #b23b32; /* 삭제·위험 */
@@ -31,8 +40,8 @@
     sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* 종이는 각지다 — 라운드는 거의 주지 않는다 (DESIGN.md §4) */
-  --radius-paper: 4px;
+  /* 공책 한 줄의 높이. 체크리스트·괘선 메모가 모두 이 값에 맞춰진다. */
+  --spacing-line: 28px;
 }
 
 body {
@@ -43,18 +52,21 @@ body {
 /* 노트가 책상 위에 놓인 느낌. 그림자는 아주 옅게만 (DESIGN.md §4) */
 @utility shadow-notebook {
   box-shadow:
-    0 1px 2px rgba(61, 53, 39, 0.08),
-    0 10px 30px rgba(61, 53, 39, 0.07);
+    0 1px 2px rgba(58, 50, 38, 0.08),
+    0 10px 30px rgba(58, 50, 38, 0.07);
 }
 
-/* 공책 괘선. 줄 간격과 line-height를 맞춰야 글자가 줄 위에 앉는다. */
+/*
+ * 공책 괘선. 줄 간격과 line-height가 같아야 글자가 줄 위에 앉는다.
+ * --spacing-line 을 바꾸면 체크리스트 줄 높이도 같이 따라온다.
+ */
 @utility ruled {
-  line-height: 32px;
+  line-height: var(--spacing-line);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
-    transparent 31px,
-    var(--color-rule) 31px,
-    var(--color-rule) 32px
+    transparent calc(var(--spacing-line) - 1px),
+    var(--color-rule) calc(var(--spacing-line) - 1px),
+    var(--color-rule) var(--spacing-line)
   );
 }

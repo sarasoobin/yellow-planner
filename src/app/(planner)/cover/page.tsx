@@ -32,19 +32,24 @@ export default async function CoverPage() {
   const doneCount = items.filter((i) => i.is_done).length
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-14 md:py-20">
+    // 표지는 책의 시작이라 종이 대신 표지색으로 꽉 채운다.
+    // 노란 바탕에서는 기본 괘선이 묻혀서 줄 색만 한 톤 진하게 바꾼다.
+    <div
+      className="flex flex-1 flex-col items-center justify-center bg-frame px-6 py-12"
+      style={{ '--color-rule': '#E0C35F' } as React.CSSProperties}
+    >
       <p className="text-6xl leading-none font-bold tracking-tight text-ink md:text-7xl">
         {year}
       </p>
 
-      <div className="mt-10 w-full max-w-md">
-        <div className="mb-3 flex items-baseline justify-between border-b border-rule pb-2">
-          <h1 className="text-sm font-semibold tracking-[0.08em] text-ink">
+      <div className="mt-12 w-full max-w-sm">
+        <div className="mb-2 flex items-baseline justify-between">
+          <h1 className="text-sm font-semibold tracking-[0.1em] text-ink">
             올해의 목표
           </h1>
           {items.length > 0 && (
-            <span className="text-xs text-ink-faint">
-              {items.length}개 중 {doneCount}개 달성
+            <span className="text-xs text-ink/55">
+              {items.length}개 중 {doneCount}개
             </span>
           )}
         </div>
@@ -54,12 +59,11 @@ export default async function CoverPage() {
           kind="year"
           date={yearDate}
           path="/cover"
-          placeholder="올해 이루고 싶은 걸 적어보세요"
-          emptyText="아직 적은 목표가 없습니다."
+          minRows={6}
         />
 
         {doneCount > 0 && (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-10 flex justify-center">
             <TallyMark count={doneCount} />
           </div>
         )}

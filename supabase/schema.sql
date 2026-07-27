@@ -51,12 +51,13 @@ create trigger on_auth_user_created
 --    'month'   | 그 달 1일           | 월간 페이지 왼쪽
 --    'event'   | 실제 날짜           | 달력 칸 + 주간 페이지 위쪽  ← 중요한 일정
 --    'task'    | 실제 날짜           | 주간 페이지 요일 칸        ← 자잘한 할 일
+--    'daily'   | 실제 날짜           | 주간 페이지 요일 옆 한 줄   ← 격언·그날의 한 마디
 -- ------------------------------------------------------------
 create table public.items (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid not null references auth.users(id) on delete cascade,
 
-  kind       text not null check (kind in ('year', 'month', 'event', 'task')),
+  kind       text not null check (kind in ('year', 'month', 'event', 'task', 'daily')),
   date       date not null,
 
   content    text not null check (char_length(content) between 1 and 200),
@@ -71,6 +72,9 @@ create table public.items (
 create index items_user_kind_date_idx on public.items (user_id, kind, date);
 -- 달력에서 그 달 전체를 한 번에 긁어올 때
 create index items_user_date_idx      on public.items (user_id, date);
+
+-- 하루에 daily(그날의 한 마디)는 하나만
+create unique index items_daily_uniq on public.items (user_id, date) where kind = 'daily';
 
 
 -- ------------------------------------------------------------

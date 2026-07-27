@@ -94,6 +94,54 @@ export async function updateItem(
   return { error: null }
 }
 
+/**
+ * 주간 페이지에서 요일 옆에 적는 한 줄(kind='daily').
+ * 하루에 하나뿐이라 "있으면 고치고 없으면 만든다".
+ * 내용을 비우면 지운다 — 빈 줄을 남겨두는 게 종이 노트에 가깝다.
+ */
+export async function saveDaily(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const id = String(formData.get('id') ?? '')
+  const date = DATE.safeParse(formData.get('date'))
+  if (!date.success) return { error: date.error.issues[0].message }
+
+  const content = String(formData.get('content') ?? '').trim()
+  const supabase = await createClient()
+
+  if (!content) {
+    if (id) await supabase.from('items').delete().eq('id', id)
+    revalidateFrom(formData)
+    return { error: null }
+  }
+
+  if (content.length > 200) {
+    return { error: '200자까지 입력할 수 있습니다.' }
+  }
+
+  if (id) {
+    const { error } = await supabase
+      .from('items')
+      .update({ content })
+      .eq('id', id)
+    if (error) return { error: '저장하지 못했습니다.' }
+  } else {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return { error: '로그인이 필요합니다.' }
+
+    const { error } = await supabase
+      .from('items')
+      .insert({ kind: 'daily', date: date.data, content, user_id: user.id })
+    if (error) return { error: '저장하지 못했습니다.' }
+  }
+
+  revalidateFrom(formData)
+  return { error: null }
+}
+
 export async function deleteItem(formData: FormData) {
   const id = String(formData.get('id') ?? '')
   if (!id) return

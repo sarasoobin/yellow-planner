@@ -1,77 +1,72 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useRef, useState } from 'react'
 import { saveNote } from '@/lib/actions/notes'
 import type { FormState } from '@/lib/types'
 
 const EMPTY: FormState = { error: null }
 
+/**
+ * 괘선 메모. 주간 페이지 아래칸과 Free Note가 같이 쓴다.
+ *
+ * 저장 버튼을 두지 않고 포커스가 빠질 때 저장한다.
+ * 공책에 적다가 손을 떼는 동작에 가깝고, 버튼이 종이 느낌을 깬다.
+ */
 export function NoteEditor({
   initialContent,
   weekStart,
   path,
-  placeholder = '자유롭게 적어보세요',
-  rows = 6,
-  lined = false,
+  rows = 4,
 }: {
   initialContent: string
   /** 주간 메모면 그 주의 월요일, Free Note면 null */
   weekStart: string | null
   path: string
-  placeholder?: string
   rows?: number
-  lined?: boolean
 }) {
   const [state, formAction, pending] = useActionState(saveNote, EMPTY)
+  const lastSaved = useRef(initialContent)
 
   /**
-   * "이 결과가 나온 뒤에 사용자가 또 고쳤는가"를 상태 객체의 참조로 판단한다.
-   * 액션이 끝날 때마다 state는 새 객체가 되므로, 타이핑 시점에 붙잡아둔 객체와
-   * 지금 state를 비교하면 effect 없이도 저장/수정 여부를 알 수 있다.
+   * "이 결과가 나온 뒤에 또 고쳤는가"를 상태 객체의 참조로 판단한다.
+   * 액션이 끝날 때마다 state는 새 객체가 되므로, effect 없이도 알 수 있다.
    */
   const [typedAt, setTypedAt] = useState<FormState | null>(null)
-  const edited = typedAt === state
-
-  const saved = state !== EMPTY && !state.error && !edited
-  // 저장에 실패했다면 고치지 않았더라도 다시 눌러볼 수 있어야 한다
-  const canSave = edited || Boolean(state.error)
+  const saved = state !== EMPTY && !state.error && typedAt !== state
 
   return (
-    <form action={formAction} className="flex flex-col gap-2">
+    <form action={formAction} className="flex h-full flex-col">
       <input type="hidden" name="path" value={path} />
       {weekStart && <input type="hidden" name="week_start" value={weekStart} />}
 
+      {/* 괘선과 글줄을 맞추려면 textarea에 padding이 없어야 한다 */}
       <textarea
         name="content"
         defaultValue={initialContent}
         rows={rows}
         maxLength={5000}
-        placeholder={placeholder}
-        aria-label={placeholder}
+        aria-label="메모"
         onChange={() => setTypedAt(state)}
-        className={`w-full resize-y bg-transparent px-1 py-1 text-sm text-ink-soft outline-none placeholder:text-ink-faint/70 ${
-          lined ? 'ruled' : ''
-        }`}
+        onBlur={(e) => {
+          if (e.currentTarget.value === lastSaved.current) return
+          lastSaved.current = e.currentTarget.value
+          e.currentTarget.form?.requestSubmit()
+        }}
+        className="ruled w-full flex-1 resize-none bg-transparent p-0 text-sm text-ink-soft outline-none"
       />
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex h-4 items-center justify-end gap-2 text-[10px]">
         {state.error && (
-          <span role="alert" className="mr-auto text-xs text-danger">
+          <span role="alert" className="mr-auto text-danger">
             {state.error}
           </span>
         )}
-        {saved && (
-          <span role="status" className="text-xs text-done">
+        {pending && <span className="text-ink-faint">저장 중…</span>}
+        {saved && !pending && (
+          <span role="status" className="text-done">
             저장됨
           </span>
         )}
-        <button
-          type="submit"
-          disabled={pending || !canSave}
-          className="cursor-pointer border border-accent px-3 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent hover:text-paper disabled:cursor-default disabled:border-rule disabled:text-ink-faint disabled:hover:bg-transparent disabled:hover:text-ink-faint"
-        >
-          {pending ? '저장 중…' : '저장'}
-        </button>
       </div>
     </form>
   )

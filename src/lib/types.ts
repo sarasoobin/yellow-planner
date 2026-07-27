@@ -1,5 +1,5 @@
 /** items.kind — 어디에 적은 것인지 구분한다. DB의 check 제약과 값이 일치해야 한다. */
-export const ITEM_KINDS = ['year', 'month', 'event', 'task'] as const
+export const ITEM_KINDS = ['year', 'month', 'event', 'task', 'daily'] as const
 export type ItemKind = (typeof ITEM_KINDS)[number]
 
 export type Item = {

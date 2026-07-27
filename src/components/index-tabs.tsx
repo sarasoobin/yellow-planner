@@ -78,7 +78,7 @@ export function IndexTabs({
               href={tab.href}
               aria-current={on ? 'page' : undefined}
               style={{ backgroundColor: tab.color }}
-              className={`shrink-0 rounded-t-[3px] px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-ink transition-opacity ${
+              className={`shrink-0 rounded-t-[3px] px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap text-ink transition-opacity ${
                 on
                   ? 'opacity-100 shadow-[inset_0_-3px_0_rgba(61,53,39,.35)]'
                   : 'opacity-55 hover:opacity-85'
@@ -95,7 +95,7 @@ export function IndexTabs({
   return (
     <nav
       aria-label="인덱스"
-      className="hidden shrink-0 flex-col gap-[3px] pt-8 md:flex"
+      className="hidden shrink-0 flex-col gap-1 pt-10 md:flex"
     >
       {tabs.map((tab) => {
         const on = tab.key === active
@@ -105,10 +105,10 @@ export function IndexTabs({
             href={tab.href}
             aria-current={on ? 'page' : undefined}
             style={{ backgroundColor: tab.color }}
-            className={`flex w-[30px] items-center justify-center rounded-r-[3px] py-3 text-[11px] font-semibold text-ink transition-all [writing-mode:vertical-rl] ${
+            className={`flex h-9 items-center justify-center rounded-r-[3px] text-xs font-semibold text-ink transition-all ${
               on
-                ? 'w-[38px] opacity-100 shadow-[1px_1px_2px_rgba(61,53,39,.18)]'
-                : 'opacity-60 hover:w-[34px] hover:opacity-90'
+                ? 'w-[58px] opacity-100 shadow-[1px_1px_3px_rgba(58,50,38,.2)]'
+                : 'w-[46px] opacity-65 hover:w-[52px] hover:opacity-95'
             }`}
           >
             {tab.label}

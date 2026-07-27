@@ -21,8 +21,8 @@ export default async function FreeNotePage() {
     .maybeSingle()
 
   return (
-    <div className="flex min-h-[60vh] flex-col px-4 py-5 md:px-8 md:py-7">
-      <h1 className="mb-4 border-b border-rule pb-2 text-sm font-semibold tracking-[0.08em] text-ink">
+    <div className="flex flex-1 flex-col bg-paper px-4 py-4 md:px-8 md:py-6">
+      <h1 className="mb-3 text-sm font-semibold tracking-[0.1em] text-ink">
         Free Note
       </h1>
 
@@ -30,9 +30,7 @@ export default async function FreeNotePage() {
         initialContent={data?.content ?? ''}
         weekStart={null}
         path="/note"
-        placeholder="달력에 넣기 애매한 것들을 적어두세요"
-        rows={16}
-        lined
+        rows={18}
       />
     </div>
   )

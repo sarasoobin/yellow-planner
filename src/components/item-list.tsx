@@ -18,8 +18,26 @@ type Props = {
   date: string
   /** 저장 후 새로 그릴 경로 */
   path: string
+  /** 내용이 적든 많든 최소 이만큼은 줄을 그어둔다 (공책 느낌) */
+  minRows?: number
   placeholder?: string
-  emptyText?: string
+}
+
+/** 빈 줄이든 글이 적힌 줄이든 높이가 같아야 괘선이 일정하다 */
+const ROW = 'flex h-line items-center gap-2 border-b border-rule'
+
+/** 종이에 그린 네모 체크박스 */
+function Box({ checked }: { checked?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`grid size-[13px] shrink-0 place-items-center border text-[9px] leading-none ${
+        checked ? 'border-done text-done' : 'border-rule text-transparent'
+      }`}
+    >
+      ✓
+    </span>
+  )
 }
 
 export function ItemList({
@@ -27,27 +45,47 @@ export function ItemList({
   kind,
   date,
   path,
-  placeholder = '할 일을 적어보세요',
-  emptyText,
+  minRows = 4,
+  placeholder = '',
 }: Props) {
-  return (
-    <div className="flex flex-col gap-1">
-      {items.length === 0 && emptyText && (
-        <p className="py-1 text-sm text-ink-faint">{emptyText}</p>
-      )}
+  // + 를 눌러 늘린 줄 수. 기본 줄을 다 채웠을 때만 필요하다.
+  const [extraRows, setExtraRows] = useState(0)
 
+  // 항상 최소 한 줄은 쓸 수 있어야 한다 (그 줄이 입력칸이 된다)
+  const blankRows = Math.max(minRows - items.length, 1) + extraRows
+
+  return (
+    <div className="flex flex-col">
       <ul className="flex flex-col">
         {items.map((item) => (
           <ItemRow key={item.id} item={item} path={path} />
         ))}
+
+        {/* 첫 빈 줄은 바로 쓸 수 있는 입력칸, 나머지는 그냥 그어둔 줄 */}
+        <li className={ROW}>
+          <AddItemForm
+            kind={kind}
+            date={date}
+            path={path}
+            placeholder={placeholder}
+          />
+        </li>
+
+        {Array.from({ length: Math.max(blankRows - 1, 0) }, (_, i) => (
+          <li key={`blank-${i}`} className={ROW}>
+            <Box />
+          </li>
+        ))}
       </ul>
 
-      <AddItemForm
-        kind={kind}
-        date={date}
-        path={path}
-        placeholder={placeholder}
-      />
+      <button
+        type="button"
+        onClick={() => setExtraRows((n) => n + 1)}
+        aria-label="줄 추가"
+        className="mt-1 w-fit cursor-pointer px-1 text-sm leading-none text-ink-faint/70 transition-colors hover:text-accent"
+      >
+        +
+      </button>
     </div>
   )
 }
@@ -62,7 +100,7 @@ function AddItemForm({
   const formRef = useRef<HTMLFormElement>(null)
   const handled = useRef<FormState | null>(null)
 
-  // 저장에 성공하면 입력칸을 비워 다음 항목을 바로 적을 수 있게 한다
+  // 저장에 성공하면 입력칸을 비워 다음 줄을 바로 적을 수 있게 한다
   useEffect(() => {
     // EMPTY는 제출 전 초기값이다. 액션이 돌면 항상 새 객체가 오므로 참조로 구분한다.
     if (state === EMPTY) return
@@ -74,30 +112,30 @@ function AddItemForm({
   }, [state])
 
   return (
-    <form ref={formRef} action={formAction} className="flex flex-col gap-1">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="flex w-full items-center gap-2"
+    >
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
 
-      <div className="flex items-center gap-2">
-        <span aria-hidden className="text-sm text-ink-faint/60">
-          +
-        </span>
-        <input
-          name="content"
-          required
-          maxLength={200}
-          placeholder={placeholder}
-          aria-label={placeholder}
-          disabled={pending}
-          className="w-full border-b border-transparent bg-transparent py-1 text-sm text-ink-soft outline-none placeholder:text-ink-faint/70 focus:border-accent disabled:opacity-50"
-        />
-      </div>
+      <Box />
+      <input
+        name="content"
+        required
+        maxLength={200}
+        placeholder={placeholder}
+        aria-label={placeholder || '새 항목'}
+        disabled={pending}
+        className="min-w-0 flex-1 bg-transparent text-sm text-ink-soft outline-none placeholder:text-ink-faint/60 disabled:opacity-50"
+      />
 
       {state.error && (
-        <p role="alert" className="pl-5 text-xs text-danger">
+        <span role="alert" className="shrink-0 text-[10px] text-danger">
           {state.error}
-        </p>
+        </span>
       )}
     </form>
   )
@@ -107,9 +145,9 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
   const [editing, setEditing] = useState(false)
 
   return (
-    <li className="group flex items-center gap-2 border-b border-rule/60 py-1">
+    <li className={`group ${ROW}`}>
       {/* 완료 토글 */}
-      <form action={toggleItem} className="flex">
+      <form action={toggleItem} className="flex shrink-0">
         <input type="hidden" name="id" value={item.id} />
         <input type="hidden" name="is_done" value={String(item.is_done)} />
         <input type="hidden" name="path" value={path} />
@@ -117,7 +155,7 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
           type="submit"
           aria-pressed={item.is_done}
           aria-label={`${item.content} ${item.is_done ? '완료 취소' : '완료'}`}
-          className="grid size-[15px] shrink-0 cursor-pointer place-items-center border border-rule text-[10px] leading-none text-done transition-colors hover:border-done"
+          className="grid size-[13px] cursor-pointer place-items-center border border-rule text-[9px] leading-none text-done transition-colors hover:border-done"
         >
           {item.is_done ? '✓' : ''}
         </button>
@@ -134,20 +172,20 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className={`flex-1 cursor-text truncate text-left text-sm ${
+            className={`min-w-0 flex-1 cursor-text truncate text-left text-sm ${
               item.is_done ? 'text-ink-faint line-through' : 'text-ink-soft'
             }`}
           >
             {item.content}
           </button>
 
-          <form action={deleteItem} className="flex">
+          <form action={deleteItem} className="flex shrink-0">
             <input type="hidden" name="id" value={item.id} />
             <input type="hidden" name="path" value={path} />
             <button
               type="submit"
               aria-label={`${item.content} 삭제`}
-              className="cursor-pointer px-1 text-xs text-ink-faint/60 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger focus:opacity-100"
+              className="cursor-pointer px-0.5 text-xs text-ink-faint/60 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger focus:opacity-100"
             >
               ✕
             </button>
@@ -181,7 +219,7 @@ function EditItemForm({
   }, [state, onDone])
 
   return (
-    <form action={formAction} className="flex flex-1 items-center gap-1.5">
+    <form action={formAction} className="flex min-w-0 flex-1 items-center gap-1">
       <input type="hidden" name="id" value={item.id} />
       <input type="hidden" name="path" value={path} />
       <input
@@ -194,23 +232,15 @@ function EditItemForm({
         onKeyDown={(e) => {
           if (e.key === 'Escape') onDone()
         }}
-        className="min-w-0 flex-1 border-b border-accent bg-transparent py-1 text-sm text-ink outline-none"
+        // 다른 곳을 눌러도 적은 내용이 날아가지 않게, 바뀌었으면 저장하고 닫는다
+        onBlur={(e) => {
+          if (e.currentTarget.value.trim() === item.content) onDone()
+          else e.currentTarget.form?.requestSubmit()
+        }}
+        className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
       />
-      <button
-        type="submit"
-        className="shrink-0 cursor-pointer text-xs text-accent"
-      >
-        저장
-      </button>
-      <button
-        type="button"
-        onClick={onDone}
-        className="shrink-0 cursor-pointer text-xs text-ink-faint"
-      >
-        취소
-      </button>
       {state.error && (
-        <span role="alert" className="text-xs text-danger">
+        <span role="alert" className="shrink-0 text-[10px] text-danger">
           {state.error}
         </span>
       )}

@@ -51,9 +51,13 @@ export default async function PlannerLayout({
             </div>
           </header>
 
-          {/* 종이. 노란 프레임이 사방에 조금 남도록 안쪽에 여백을 둔다. */}
+          {/*
+            종이. 노란 프레임이 사방에 조금 남도록 안쪽에 여백을 둔다.
+            표지·월간·주간의 높이가 같아야 페이지를 넘겨도 노트 크기가 안 흔들린다.
+            배경색은 각 페이지가 정한다 (표지는 전체가 노란색이다).
+          */}
           <div className="flex flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">
-            <main className="flex-1 border border-rule bg-paper">
+            <main className="flex min-h-[560px] flex-1 flex-col border border-rule md:min-h-[700px]">
               {children}
             </main>
           </div>

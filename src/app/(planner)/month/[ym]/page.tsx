@@ -75,32 +75,28 @@ export default async function MonthPage({ params }: Params) {
   const monthDone = monthItems.filter((i) => i.is_done).length
 
   return (
-    <div className="flex flex-col md:flex-row">
-      {/* 왼쪽 단 — 월 제목 + 이 달 할 일 + 正자 집계 */}
-      <aside className="shrink-0 border-b border-rule bg-frame/35 px-4 py-5 md:w-56 md:border-r md:border-b-0 md:px-5">
-        <h1 className="mb-4 text-3xl font-bold text-ink">{monthLabel(ym)}</h1>
+    <div className="flex flex-1 flex-col bg-paper md:flex-row">
+      {/* 왼쪽 단 — 달력에 자리를 많이 내주려고 좁게 잡는다 */}
+      <aside className="flex shrink-0 flex-col border-b border-rule bg-frame/30 px-3 py-4 md:w-40 md:border-r md:border-b-0">
+        <h1 className="mb-3 text-2xl font-bold text-ink">{monthLabel(ym)}</h1>
 
-        <h2 className="mb-2 border-b border-rule pb-1 text-xs font-semibold tracking-[0.08em] text-ink-soft">
-          이 달 할 일
-        </h2>
         <ItemList
           items={monthItems}
           kind="month"
           date={firstDay}
           path={`/month/${ym}`}
-          placeholder="이 달에 할 일"
-          emptyText="아직 없습니다."
+          minRows={5}
         />
 
         {monthDone > 0 && (
-          <div className="mt-8">
+          <div className="mt-auto pt-8">
             <TallyMark count={monthDone} />
           </div>
         )}
       </aside>
 
       {/* 오른쪽 — 달력 */}
-      <div className="min-w-0 flex-1 px-3 py-4 md:px-5 md:py-5">
+      <div className="flex min-w-0 flex-1 flex-col px-3 py-4 md:px-4 md:py-4">
         <div className="mb-1 flex pl-7">
           {WEEKDAY_LABELS.map((label, i) => (
             <div
@@ -114,9 +110,10 @@ export default async function MonthPage({ params }: Params) {
           ))}
         </div>
 
-        <div className="flex flex-col border-t border-l border-rule">
+        {/* 남는 세로 공간을 주(週) 수만큼 나눠 가져 칸이 최대한 커진다 */}
+        <div className="flex flex-1 flex-col border-t border-l border-rule">
           {grid.map((week) => (
-            <div key={week[0]} className="flex">
+            <div key={week[0]} className="flex flex-1">
               {/* 주차 버튼 — 그 주의 주간 페이지로 (DESIGN.md §5-3) */}
               <Link
                 href={`/week/${week[0]}`}
@@ -135,8 +132,8 @@ export default async function MonthPage({ params }: Params) {
                 return (
                   <div
                     key={date}
-                    className={`min-h-[74px] min-w-0 flex-1 border-r border-b border-rule p-1 md:min-h-[92px] ${
-                      inMonth ? '' : 'bg-desk/40'
+                    className={`min-h-[76px] min-w-0 flex-1 border-r border-b border-rule p-1 ${
+                      inMonth ? '' : 'bg-desk/50'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-1">

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { DailyLine } from '@/components/daily-line'
 import { ItemList } from '@/components/item-list'
 import { NoteEditor } from '@/components/note-editor'
 import {
@@ -32,6 +33,7 @@ export default async function WeekPage({ params }: Params) {
   const days = weekDays(monday)
   const today = todayISO()
   const ym = monday.slice(0, 7)
+  const path = `/week/${monday}`
 
   const supabase = await createClient()
   const {
@@ -43,7 +45,7 @@ export default async function WeekPage({ params }: Params) {
     supabase
       .from('items')
       .select('*')
-      .in('kind', ['event', 'task'])
+      .in('kind', ['event', 'task', 'daily'])
       .gte('date', days[0])
       .lte('date', days[6])
       .order('sort_order', { ascending: true })
@@ -60,17 +62,22 @@ export default async function WeekPage({ params }: Params) {
 
   const eventsByDate = new Map<string, Item[]>()
   const tasksByDate = new Map<string, Item[]>()
+  const dailyByDate = new Map<string, Item>()
   for (const item of items) {
-    const bucket = item.kind === 'event' ? eventsByDate : tasksByDate
-    const list = bucket.get(item.date) ?? []
-    list.push(item)
-    bucket.set(item.date, list)
+    if (item.kind === 'daily') {
+      dailyByDate.set(item.date, item)
+    } else {
+      const bucket = item.kind === 'event' ? eventsByDate : tasksByDate
+      const list = bucket.get(item.date) ?? []
+      list.push(item)
+      bucket.set(item.date, list)
+    }
   }
 
   return (
-    <div className="flex flex-col px-3 py-4 md:px-5 md:py-5">
-      <header className="mb-4 flex items-baseline justify-between gap-3 border-b border-rule pb-2">
-        <h1 className="text-lg font-bold text-ink">
+    <div className="flex flex-1 flex-col bg-paper px-3 py-3 md:px-4 md:py-4">
+      <header className="mb-2 flex items-baseline justify-between gap-3">
+        <h1 className="text-base font-bold text-ink">
           {weekRangeLabel(monday)}
         </h1>
         <Link
@@ -81,83 +88,85 @@ export default async function WeekPage({ params }: Params) {
         </Link>
       </header>
 
-      {/* 데스크톱 7열 / 모바일 세로 쌓기 (DESIGN.md §6) */}
-      <div className="grid grid-cols-1 gap-px bg-rule md:grid-cols-7">
-        {days.map((date, i) => {
-          const isToday = date === today
-          const events = eventsByDate.get(date) ?? []
-          const tasks = tasksByDate.get(date) ?? []
+      {/*
+        요일 칸의 세로줄이 아래 메모칸의 가로줄과 직교로 만나야 한다.
+        그래서 둘을 같은 테두리 안에 넣고 사이에 여백을 두지 않는다.
+      */}
+      <div className="flex flex-1 flex-col border border-rule">
+        <div className="grid flex-1 grid-cols-1 md:grid-cols-7">
+          {days.map((date, i) => {
+            const isToday = date === today
+            const events = eventsByDate.get(date) ?? []
+            const tasks = tasksByDate.get(date) ?? []
 
-          return (
-            <section
-              key={date}
-              className={`flex min-h-[150px] flex-col gap-2 p-2 ${
-                isToday ? 'bg-frame/30' : 'bg-paper'
-              }`}
-            >
-              <div className="flex items-baseline gap-1.5">
-                <span
-                  className={`text-xs font-semibold ${
-                    i === 6 ? 'text-today' : 'text-ink-faint'
-                  }`}
-                >
-                  {WEEKDAY_LABELS[i]}
-                </span>
-                <span
-                  className={`grid size-[20px] place-items-center rounded-full text-[13px] leading-none font-bold ${
-                    isToday ? 'bg-today text-paper' : 'text-ink'
-                  }`}
-                >
-                  {dayNumber(date)}
-                </span>
-              </div>
-
-              {/* 그 날의 중요 일정 — 달력에서 적은 것이 올라온다. 여기선 수정하지 않는다 */}
-              {events.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  {events.map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex items-center gap-1.5 text-[12px] leading-tight font-semibold text-ink"
-                    >
-                      <span
-                        className="h-3 w-[3px] shrink-0"
-                        style={{ backgroundColor: event.color ?? '#C1453C' }}
-                      />
-                      <span className="truncate" title={event.content}>
-                        {event.content}
-                      </span>
-                    </div>
-                  ))}
+            return (
+              <section
+                key={date}
+                className={`flex min-w-0 flex-col gap-1 border-b border-rule p-1.5 last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0 ${
+                  isToday ? 'bg-frame/25' : ''
+                }`}
+              >
+                {/* 요일 · 날짜 · 그 날 한 줄 */}
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`shrink-0 text-[11px] font-semibold ${
+                      i === 6 ? 'text-today' : 'text-ink-faint'
+                    }`}
+                  >
+                    {WEEKDAY_LABELS[i]}
+                  </span>
+                  <span
+                    className={`grid size-[19px] shrink-0 place-items-center rounded-full text-[12px] leading-none font-bold ${
+                      isToday ? 'bg-today text-paper' : 'text-ink'
+                    }`}
+                  >
+                    {dayNumber(date)}
+                  </span>
+                  <DailyLine item={dailyByDate.get(date)} date={date} path={path} />
                 </div>
-              )}
 
-              <div className="border-t border-dashed border-rule" />
+                {/* 중요 일정 — 달력에서 적은 것이 올라온다. 여기선 고치지 않는다 */}
+                {events.length > 0 && (
+                  <div className="flex flex-col gap-0.5">
+                    {events.map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex items-center gap-1.5 text-[12px] leading-tight font-semibold text-ink"
+                      >
+                        <span
+                          className="h-3 w-[3px] shrink-0"
+                          style={{ backgroundColor: event.color ?? '#C1453C' }}
+                        />
+                        <span className="truncate" title={event.content}>
+                          {event.content}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-              <ItemList
-                items={tasks}
-                kind="task"
-                date={date}
-                path={`/week/${monday}`}
-                placeholder="할 일"
-              />
-            </section>
-          )
-        })}
+                <ItemList
+                  items={tasks}
+                  kind="task"
+                  date={date}
+                  path={path}
+                  minRows={4}
+                />
+              </section>
+            )
+          })}
+        </div>
+
+        {/* 주간 메모 — 제목 없이 줄만. 공책 아래칸이라는 게 보이면 충분하다 */}
+        <div className="border-t border-rule p-2 md:p-2.5">
+          <NoteEditor
+            initialContent={noteData?.content ?? ''}
+            weekStart={monday}
+            path={path}
+            rows={4}
+          />
+        </div>
       </div>
-
-      <section className="mt-5">
-        <h2 className="mb-2 border-b border-rule pb-1 text-xs font-semibold tracking-[0.08em] text-ink-soft">
-          이번 주 메모
-        </h2>
-        <NoteEditor
-          initialContent={noteData?.content ?? ''}
-          weekStart={monday}
-          path={`/week/${monday}`}
-          placeholder="이번 주에 기억할 것"
-          rows={4}
-        />
-      </section>
     </div>
   )
 }
