@@ -1,9 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState } from 'react'
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import {
   createItem,
   deleteItem,
+  reorderItems,
   toggleItem,
   updateItem,
 } from '@/lib/actions/items'
@@ -54,11 +55,81 @@ export function ItemList({
   // 항상 최소 한 줄은 쓸 수 있어야 한다 (그 줄이 입력칸이 된다)
   const blankRows = Math.max(minRows - items.length, 1) + extraRows
 
+  const listRef = useRef<HTMLUListElement>(null)
+  const orderRef = useRef<HTMLInputElement>(null)
+  const orderFormRef = useRef<HTMLFormElement>(null)
+
+  const [from, setFrom] = useState<number | null>(null)
+  const [to, setTo] = useState<number | null>(null)
+
+  /**
+   * 드래그 중 위치 계산에 쓸 기준값.
+   * 줄 높이가 모두 같아서 "시작 위치 + 줄 높이"만 알면 몇 번째 줄인지 나온다.
+   * 화면에서 줄이 섞여도 이 기준은 흔들리지 않는다.
+   */
+  const geom = useRef<{ top: number; height: number } | null>(null)
+
+  // 드래그하는 동안 보이는 순서. 손을 떼기 전에 결과를 미리 보여준다.
+  const view = useMemo(() => {
+    if (from === null || to === null || from === to) return items
+    const next = [...items]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    return next
+  }, [items, from, to])
+
+  function startDrag(index: number, event: React.PointerEvent) {
+    const rows = listRef.current?.children
+    const first = rows?.[0] as HTMLElement | undefined
+    if (!first) return
+
+    const rect = first.getBoundingClientRect()
+    geom.current = { top: rect.top, height: rect.height }
+
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setFrom(index)
+    setTo(index)
+  }
+
+  function moveDrag(event: React.PointerEvent) {
+    if (from === null || !geom.current) return
+    const { top, height } = geom.current
+    const raw = Math.floor((event.clientY - top) / height)
+    setTo(Math.min(Math.max(raw, 0), items.length - 1))
+  }
+
+  function endDrag() {
+    if (from !== null && to !== null && from !== to && orderRef.current) {
+      orderRef.current.value = view.map((item) => item.id).join(',')
+      orderFormRef.current?.requestSubmit()
+    }
+    setFrom(null)
+    setTo(null)
+    geom.current = null
+  }
+
   return (
     <div className="flex flex-col">
-      <ul className="flex flex-col">
-        {items.map((item) => (
-          <ItemRow key={item.id} item={item} path={path} />
+      {/* 순서 저장 전용 폼. 화면에는 보이지 않는다. */}
+      <form ref={orderFormRef} action={reorderItems} className="hidden">
+        <input type="hidden" name="path" value={path} />
+        <input ref={orderRef} type="hidden" name="ids" defaultValue="" />
+      </form>
+
+      <ul
+        ref={listRef}
+        className={`flex flex-col ${from !== null ? 'select-none' : ''}`}
+      >
+        {view.map((item, index) => (
+          <ItemRow
+            key={item.id}
+            item={item}
+            path={path}
+            dragging={from !== null && to === index}
+            onDragStart={(event) => startDrag(index, event)}
+            onDragMove={moveDrag}
+            onDragEnd={endDrag}
+          />
         ))}
 
         {/* 첫 빈 줄은 바로 쓸 수 있는 입력칸, 나머지는 그냥 그어둔 줄 */}
@@ -141,11 +212,28 @@ function AddItemForm({
   )
 }
 
-function ItemRow({ item, path }: { item: Item; path: string }) {
+function ItemRow({
+  item,
+  path,
+  dragging,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: {
+  item: Item
+  path: string
+  dragging: boolean
+  onDragStart: (event: React.PointerEvent) => void
+  onDragMove: (event: React.PointerEvent) => void
+  onDragEnd: () => void
+}) {
   const [editing, setEditing] = useState(false)
 
   return (
-    <li className={`group ${ROW}`}>
+    <li
+      className={`group ${ROW} ${dragging ? 'bg-frame/40' : ''}`}
+      data-dragging={dragging || undefined}
+    >
       {/* 완료 토글 */}
       <form action={toggleItem} className="flex shrink-0">
         <input type="hidden" name="id" value={item.id} />
@@ -177,6 +265,19 @@ function ItemRow({ item, path }: { item: Item; path: string }) {
             }`}
           >
             {item.content}
+          </button>
+
+          {/* 순서 바꾸기 손잡이. 폰에서는 hover가 없어 항상 보인다. */}
+          <button
+            type="button"
+            aria-label={`${item.content} 순서 바꾸기`}
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
+            className="shrink-0 cursor-grab touch-none px-0.5 text-[11px] leading-none text-ink-faint/60 transition-opacity active:cursor-grabbing md:opacity-0 md:group-hover:opacity-100"
+          >
+            ⠿
           </button>
 
           <form action={deleteItem} className="flex shrink-0">

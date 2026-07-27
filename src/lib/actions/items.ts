@@ -52,9 +52,22 @@ export async function createItem(
   } = await supabase.auth.getUser()
   if (!user) return { error: '로그인이 필요합니다.' }
 
-  const { error } = await supabase
+  // 새 항목은 늘 맨 아래에 붙는다.
+  // 기본값 0으로 두면 순서를 바꾼 뒤 추가한 것이 중간에 끼어든다.
+  const { data: last } = await supabase
     .from('items')
-    .insert({ ...parsed.data, user_id: user.id })
+    .select('sort_order')
+    .eq('kind', parsed.data.kind)
+    .eq('date', parsed.data.date)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const { error } = await supabase.from('items').insert({
+    ...parsed.data,
+    user_id: user.id,
+    sort_order: (last?.sort_order ?? -1) + 1,
+  })
 
   if (error) return { error: '저장하지 못했습니다. 잠시 후 다시 시도해주세요.' }
 
@@ -92,6 +105,29 @@ export async function updateItem(
 
   revalidateFrom(formData)
   return { error: null }
+}
+
+/**
+ * 드래그로 바뀐 순서를 저장한다.
+ * 화면에 보이는 순서대로 id를 받아 sort_order를 0,1,2… 로 다시 매긴다.
+ *
+ * 남의 id가 섞여 들어와도 RLS가 막아 그 행만 0건 수정되고 끝난다.
+ */
+export async function reorderItems(formData: FormData) {
+  const raw = formData.get('ids')
+  if (typeof raw !== 'string') return
+
+  const ids = raw.split(',').filter(Boolean)
+  if (ids.length === 0 || ids.length > 200) return
+
+  const supabase = await createClient()
+  await Promise.all(
+    ids.map((id, index) =>
+      supabase.from('items').update({ sort_order: index }).eq('id', id),
+    ),
+  )
+
+  revalidateFrom(formData)
 }
 
 /**
