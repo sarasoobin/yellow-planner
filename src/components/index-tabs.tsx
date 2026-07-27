@@ -2,6 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import {
+  COVER_COLOR,
+  MONTH_COLORS,
+  NOTE_COLOR,
+  yearMonth,
+} from '@/lib/month-colors'
 
 /**
  * 노트 옆에 붙는 인덱스 탭 14개 — 표지 · 1~12월 · 메모.
@@ -10,30 +16,17 @@ import { usePathname } from 'next/navigation'
  * 14개를 세로로 쌓으면 375px 화면에 절대 들어가지 않는다.
  */
 
-/** DESIGN.md §2 — 계절을 따라간 12개월 색 */
-const MONTH_COLORS = [
-  '#A8C4D9', '#B8B0D4', '#F0BCC8', '#F5C9A0',
-  '#C5DBA0', '#9CC9A8', '#8FC5D6', '#F5B889',
-  '#D9B896', '#E09A73', '#B8A894', '#8FA3C4',
-]
-
-const COVER_COLOR = '#E0CE72'
-const NOTE_COLOR = '#C9C4BC'
-
 type Tab = { key: string; label: string; href: string; color: string }
 
 function buildTabs(year: number): Tab[] {
   return [
     { key: 'cover', label: '표지', href: '/cover', color: COVER_COLOR },
-    ...MONTH_COLORS.map((color, i) => {
-      const mm = String(i + 1).padStart(2, '0')
-      return {
-        key: `m${mm}`,
-        label: `${i + 1}월`,
-        href: `/month/${year}-${mm}`,
-        color,
-      }
-    }),
+    ...MONTH_COLORS.map((color, i) => ({
+      key: `m${String(i + 1).padStart(2, '0')}`,
+      label: `${i + 1}월`,
+      href: `/month/${yearMonth(year, i + 1)}`,
+      color,
+    })),
     { key: 'note', label: '메모', href: '/note', color: NOTE_COLOR },
   ]
 }

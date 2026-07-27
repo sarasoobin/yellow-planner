@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { PaperBlock } from '@/components/paper-block'
 import { StickerLayer } from '@/components/sticker-layer'
 import { TallyMark } from '@/components/tally-mark'
-import { countChecked, toBlock } from '@/lib/blocks'
+import { MonthlyProgress } from '@/components/monthly-progress'
+import { countBoxes, countChecked, toBlock } from '@/lib/blocks'
 import { yearFirstDay } from '@/lib/dates'
 import type { Item } from '@/lib/types'
 
@@ -22,19 +23,39 @@ export default async function CoverPage() {
   const year = new Date().getFullYear()
   const yearDate = yearFirstDay(year)
 
-  // 올해 목표 칸과 이 페이지에 붙인 스티커를 한 번에 가져온다
-  const { data } = await supabase
-    .from('items')
-    .select('*')
-    .in('kind', ['year', 'sticker'])
-    .eq('date', yearDate)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
+  const [{ data }, { data: yearRows }] = await Promise.all([
+    // 올해 목표 칸과 이 페이지에 붙인 스티커
+    supabase
+      .from('items')
+      .select('*')
+      .in('kind', ['year', 'sticker'])
+      .eq('date', yearDate)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true }),
+    // 월별 달성률에 쓸 올해치 전부.
+    // 표지의 올해 목표(year)는 1월 1일에 저장되므로 빼야 1월에 섞이지 않는다.
+    supabase
+      .from('items')
+      .select('date, content')
+      .in('kind', ['month', 'event', 'task', 'daily'])
+      .gte('date', yearDate)
+      .lte('date', `${year}-12-31`),
+  ])
 
   const all = (data ?? []) as Item[]
   const block = toBlock(all.filter((i) => i.kind === 'year'))
   const stickers = all.filter((i) => i.kind === 'sticker')
   const doneCount = countChecked(block.content)
+
+  // 1~12월 순서로 네모 개수를 센다
+  const months = Array.from({ length: 12 }, () => ({ done: 0, total: 0 }))
+  for (const row of yearRows ?? []) {
+    const index = Number(row.date.slice(5, 7)) - 1
+    if (index < 0 || index > 11) continue
+    const counted = countBoxes(row.content)
+    months[index].done += counted.done
+    months[index].total += counted.total
+  }
 
   return (
     // 가운데는 다른 페이지와 같은 종이색. 노란 표지는 바깥 프레임이 맡는다.
@@ -69,6 +90,11 @@ export default async function CoverPage() {
             <TallyMark count={doneCount} />
           </div>
         )}
+
+        {/* 통계 페이지 대신 표지에서 한 해를 한눈에 (PRODUCT.md §5) */}
+        <div className="mt-12">
+          <MonthlyProgress year={year} months={months} />
+        </div>
       </div>
     </StickerLayer>
   )

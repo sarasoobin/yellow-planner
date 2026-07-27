@@ -44,6 +44,18 @@ export function countChecked(content: string): number {
   return (content.match(/☑/g) ?? []).length
 }
 
+/**
+ * 그려둔 네모와 그중 체크한 것.
+ *
+ * 네모를 안 그린 줄은 세지 않는다. 그냥 적어둔 메모까지 "미완료"로 잡으면
+ * 완료율이 늘 바닥에 붙어서 아무 뜻이 없어진다.
+ */
+export function countBoxes(content: string): { done: number; total: number } {
+  const done = (content.match(/☑/g) ?? []).length
+  const todo = (content.match(/☐/g) ?? []).length
+  return { done, total: done + todo }
+}
+
 /** 적힌 줄 수. 빈 줄은 세지 않는다 (달력의 할 일 개수 점에 쓴다). */
 export function countLines(content: string): number {
   return content.split('\n').filter((line) => line.trim()).length
