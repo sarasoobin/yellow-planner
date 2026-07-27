@@ -1,3 +1,4 @@
+import { toPlainText } from '@/lib/rich-text'
 import type { Item, ItemStyle } from '@/lib/types'
 
 /**
@@ -39,9 +40,14 @@ export function blocksByDate(rows: Item[]): Map<string, Block> {
   return blocks
 }
 
+/*
+ * 아래 셈들은 전부 태그를 걷어낸 글자 위에서 한다.
+ * HTML 안의 속성값에 우연히 같은 글자가 들어가도 세지 않기 위해서다.
+ */
+
 /** 체크한 개수. 그려둔 네모 중 체크된 것을 센다 (正자 집계에 쓴다). */
 export function countChecked(content: string): number {
-  return (content.match(/☑/g) ?? []).length
+  return (toPlainText(content).match(/☑/g) ?? []).length
 }
 
 /**
@@ -51,17 +57,24 @@ export function countChecked(content: string): number {
  * 완료율이 늘 바닥에 붙어서 아무 뜻이 없어진다.
  */
 export function countBoxes(content: string): { done: number; total: number } {
-  const done = (content.match(/☑/g) ?? []).length
-  const todo = (content.match(/☐/g) ?? []).length
+  const text = toPlainText(content)
+  const done = (text.match(/☑/g) ?? []).length
+  const todo = (text.match(/☐/g) ?? []).length
   return { done, total: done + todo }
 }
 
 /** 적힌 줄 수. 빈 줄은 세지 않는다 (달력의 할 일 개수 점에 쓴다). */
 export function countLines(content: string): number {
-  return content.split('\n').filter((line) => line.trim()).length
+  return toPlainText(content)
+    .split('\n')
+    .filter((line) => line.trim()).length
 }
 
 /** 첫 줄. 달력에 적은 그 날 가장 중요한 일정을 주간 페이지 위에 띄우는 데 쓴다. */
 export function firstLine(content: string): string {
-  return content.split('\n').find((line) => line.trim()) ?? ''
+  return (
+    toPlainText(content)
+      .split('\n')
+      .find((line) => line.trim()) ?? ''
+  )
 }

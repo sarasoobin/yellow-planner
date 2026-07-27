@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { isBlank } from '@/lib/rich-text'
+import { sanitizeRich } from '@/lib/sanitize'
 import { ITEM_KINDS, type FormState, type ItemStyle } from '@/lib/types'
 
 /**
@@ -85,11 +87,20 @@ export async function saveBlock(
     return { error: '저장할 자리를 찾지 못했습니다.' }
   }
 
-  // 끝에 남은 빈 줄은 저장하지 않는다. 줄바꿈만 눌러도 칸이 살아나면 곤란하다.
-  const content = String(formData.get('content') ?? '').replace(/\s+$/, '')
-  if (content.length > MAX_LENGTH) {
+  const raw = String(formData.get('content') ?? '')
+  if (raw.length > MAX_LENGTH) {
     return { error: `${MAX_LENGTH}자까지 적을 수 있습니다.` }
   }
+
+  /*
+   * 서식을 담으려고 HTML로 저장한다. 붙여넣기로 들어온 것이 그대로 남으면
+   * 그 글을 보는 사람 화면에서 실행된다. 허용 목록에 없는 것은 여기서 버린다.
+   * 화면에 그리기 직전이 아니라 저장 직전에 거른다 — 한 번만 거치면 되고,
+   * 이후 어디서 읽어도 안전한 값이 나온다.
+   */
+  const sanitized = sanitizeRich(raw)
+  // 태그만 남고 글자가 없으면 빈 칸으로 본다. 줄바꿈만 눌러도 칸이 살아나면 곤란하다.
+  const content = isBlank(sanitized) ? '' : sanitized
 
   const color = HEX.safeParse(formData.get('color'))
   const style = parseStyle(formData.get('style'))

@@ -4,34 +4,29 @@ import { useActionState, useRef, useState, useSyncExternalStore } from 'react'
 import { saveBlock } from '@/lib/actions/items'
 import { PENS } from '@/components/toolbar'
 import { HIGHLIGHT } from '@/lib/stickers'
+import { isBlank, toDisplayHtml } from '@/lib/rich-text'
 import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
 
 /**
  * 종이 한 칸.
  *
- * 이 앱은 웹이 아니라 종이다. 그래서 한 칸은 줄 목록이 아니라
- * 그냥 글을 적는 자리다. 마구잡이로 쓰고, Enter를 치면 줄이 바뀌고,
- * 칸 끝에 닿으면 알아서 다음 줄로 넘어간다.
+ * 이 앱은 웹이 아니라 종이다. 한 칸은 줄 목록이 아니라 그냥 글을 적는 자리다.
+ * 마구잡이로 쓰고, Enter를 치면 줄이 바뀌고, 칸 끝에 닿으면 다음 줄로 넘어간다.
+ *
+ * textarea 가 아니라 contenteditable 을 쓴다.
+ * 한 칸 안에서 "이 단어만" 굵게, "이 줄만" 빨갛게 하려면 글자마다 서식이
+ * 달라야 하는데, textarea 는 통째로 한 가지 모양밖에 못 가진다.
+ *
+ * 서식은 브라우저 내장 편집 기능(execCommand)에 맡긴다. 오래된 API지만
+ * 한글 입력(IME)과 선택 영역 처리를 직접 짜는 것보다 훨씬 안전하다.
  *
  * 체크박스는 손으로 그리는 것이라 글자로 넣는다 (☐ / ☑).
- * 그래서 줄 앞이든 문장 중간이든 커서가 있는 자리 어디에나 그릴 수 있다.
- * 그려둔 네모를 누르면 체크되고, 다시 누르면 풀린다.
- *
- * 꾸미기는 두 갈래로 연다.
- *   컴퓨터 — 적던 자리에서 `/`
- *   폰     — 칸을 누르면 화면 위에 뜨는 꾸미기 줄
- * 폰에서 `/` 를 치려면 기호 키보드로 넘어가야 해서 그것만으로는 불편하다.
+ * 줄 앞이든 문장 중간이든 커서가 있는 자리 어디에나 그릴 수 있다.
  */
 
 const BOX = '☐'
 const CHECKED = '☑'
 
-/**
- * 좁은 화면인가.
- *
- * useEffect + setState 대신 useSyncExternalStore 를 쓴다.
- * 첫 그림에서 이미 맞는 값이라 화면이 한 번 깜빡이지 않는다.
- */
 const NARROW = '(max-width: 767px)'
 
 function subscribeNarrow(onChange: () => void) {
@@ -40,6 +35,7 @@ function subscribeNarrow(onChange: () => void) {
   return () => query.removeEventListener('change', onChange)
 }
 
+/** 좁은 화면인가. 첫 그림부터 맞는 값이라 메뉴가 한 번 잘못 그려지지 않는다. */
 function useIsNarrow(): boolean {
   return useSyncExternalStore(
     subscribeNarrow,
@@ -50,9 +46,7 @@ function useIsNarrow(): boolean {
 
 /**
  * 공책 괘선.
- *
  * 칸마다 줄 간격이 달라서(달력 칸은 좁다) 클래스 대신 값으로 만든다.
- * CSS 변수를 인라인 style 의 "키"로 넘기면 React가 처리하지 못한다.
  */
 function ruledGradient(lineHeight: number): string {
   const rule = lineHeight - 6
@@ -64,9 +58,10 @@ function ruledGradient(lineHeight: number): string {
   ].join(' ')
 }
 
-type Draft = { color: string; style: ItemStyle }
-
-const DEFAULT_DRAFT: Draft = { color: PENS[0].hex, style: {} }
+type Command =
+  | { kind: 'insert'; text: string }
+  | { kind: 'exec'; name: string; value?: string }
+  | { kind: 'size'; px: number }
 
 type Option = {
   key: string
@@ -74,9 +69,7 @@ type Option = {
   /** 영문으로 쳐도 찾아지게 */
   alias: string
   icon: React.ReactNode
-  /** 글자를 끼워 넣는 항목이면 이 값을 커서 자리에 넣는다 */
-  insert?: string
-  apply?: (draft: Draft) => Draft
+  command: Command
 }
 
 const SIZE_LABELS: { key: SizeKey; label: string }[] = [
@@ -92,21 +85,21 @@ const OPTIONS: Option[] = [
     label: '체크박스',
     alias: 'checkbox todo box',
     icon: <span className="text-[13px] leading-none">{BOX}</span>,
-    insert: `${BOX} `,
+    command: { kind: 'insert', text: `${BOX} ` },
   },
   {
     key: 'bold',
     label: '굵게',
     alias: 'bold',
     icon: <span className="text-[11px] font-bold">B</span>,
-    apply: (d) => ({ ...d, style: { ...d.style, bold: !d.style.bold } }),
+    command: { kind: 'exec', name: 'bold' },
   },
   {
     key: 'italic',
     label: '기울임',
     alias: 'italic',
     icon: <span className="font-serif text-[11px] italic">I</span>,
-    apply: (d) => ({ ...d, style: { ...d.style, italic: !d.style.italic } }),
+    command: { kind: 'exec', name: 'italic' },
   },
   {
     key: 'highlight',
@@ -118,10 +111,7 @@ const OPTIONS: Option[] = [
         style={{ backgroundColor: HIGHLIGHT }}
       />
     ),
-    apply: (d) => ({
-      ...d,
-      style: { ...d.style, highlight: !d.style.highlight },
-    }),
+    command: { kind: 'exec', name: 'hiliteColor', value: HIGHLIGHT },
   },
   ...PENS.map((pen) => ({
     key: `pen-${pen.key}`,
@@ -134,7 +124,7 @@ const OPTIONS: Option[] = [
         style={{ backgroundColor: pen.hex }}
       />
     ),
-    apply: (d: Draft) => ({ ...d, color: pen.hex }),
+    command: { kind: 'exec' as const, name: 'foreColor', value: pen.hex },
   })),
   ...SIZE_LABELS.map((size) => ({
     key: `size-${size.key}`,
@@ -148,9 +138,30 @@ const OPTIONS: Option[] = [
         가
       </span>
     ),
-    apply: (d: Draft) => ({ ...d, style: { ...d.style, size: size.key } }),
+    command: { kind: 'size' as const, px: SIZES[size.key] },
   })),
 ]
+
+/** 고른 글자를 span 으로 감싸 크기를 준다. execCommand 의 fontSize 는 1~7 뿐이라 직접 한다. */
+function wrapFontSize(px: number) {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return
+  const range = selection.getRangeAt(0)
+  if (range.collapsed) return
+
+  const span = document.createElement('span')
+  span.style.fontSize = `${px}px`
+  try {
+    span.appendChild(range.extractContents())
+    range.insertNode(span)
+    selection.removeAllRanges()
+    const after = document.createRange()
+    after.selectNodeContents(span)
+    selection.addRange(after)
+  } catch {
+    // 선택이 태그 경계를 어중간하게 걸친 경우. 크기만 안 걸리고 글은 그대로다.
+  }
+}
 
 export function PaperBlock({
   kind,
@@ -181,109 +192,116 @@ export function PaperBlock({
   lineHeight?: number
   /** 줄을 그을지. 한 줄짜리 칸은 긋지 않는다 */
   ruled?: boolean
-  /**
-   * 첫 줄만 들여쓴다. 달력 칸에서 날짜 옆부터 쓰기 시작하고,
-   * 길어지면 다음 줄은 칸 왼쪽 끝부터 이어지게 하는 데 쓴다.
-   */
+  /** 첫 줄만 들여쓴다 (달력 칸에서 날짜를 피하려고) */
   firstLineIndent?: number
   fontSize?: number
   className?: string
 }) {
   const [state, formAction] = useActionState(saveBlock, { error: null })
-  const [draft, setDraft] = useState<Draft>({
-    color: color ?? DEFAULT_DRAFT.color,
-    style: style ?? {},
-  })
-
-  const areaRef = useRef<HTMLTextAreaElement>(null)
-  const saved = useRef(content)
   const narrow = useIsNarrow()
 
+  const editorRef = useRef<HTMLDivElement>(null)
+  const hiddenRef = useRef<HTMLInputElement>(null)
+  const saved = useRef(content)
+
+  const [empty, setEmpty] = useState(() => isBlank(content))
   const [focused, setFocused] = useState(false)
 
-  // `/` 가 시작된 자리. 메뉴에서 고르면 여기부터 커서까지를 지운다.
-  const [slashAt, setSlashAt] = useState<number | null>(null)
-  const [query, setQuery] = useState('')
+  // `/` 를 친 자리. 메뉴에서 고르면 여기부터 커서까지를 지운다.
+  const slashRef = useRef<{ node: Text; from: number; to: number } | null>(null)
+  const [query, setQuery] = useState<string | null>(null)
   const [active, setActive] = useState(0)
-  const [menuLine, setMenuLine] = useState(0)
+  const [menuAt, setMenuAt] = useState({ top: 0, left: 0 })
 
-  const matches = query
-    ? OPTIONS.filter(
-        (o) => o.label.includes(query) || o.alias.includes(query.toLowerCase()),
-      )
-    : OPTIONS
-  const slashOpen = slashAt !== null && matches.length > 0
+  const matches =
+    query === null
+      ? OPTIONS
+      : OPTIONS.filter(
+          (o) =>
+            o.label.includes(query) || o.alias.includes(query.toLowerCase()),
+        )
+  const slashOpen = query !== null && matches.length > 0
 
   function closeMenu() {
-    setSlashAt(null)
-    setQuery('')
+    slashRef.current = null
+    setQuery(null)
     setActive(0)
-  }
-
-  /** 글이 길어지면 칸도 같이 늘어난다. 종이에 칸을 더 쓰는 것과 같다. */
-  function grow(el: HTMLTextAreaElement) {
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
   }
 
   /** 커서 앞의 `/명령어` 를 살펴 메뉴를 열거나 닫는다 */
-  function syncMenu(el: HTMLTextAreaElement) {
-    const caret = el.selectionStart
-    const before = el.value.slice(0, caret)
+  function syncMenu() {
+    const root = editorRef.current
+    const selection = window.getSelection()
+    if (!root || !selection || selection.rangeCount === 0) return closeMenu()
+
+    const node = selection.anchorNode
+    if (!node || !root.contains(node) || node.nodeType !== Node.TEXT_NODE) {
+      return closeMenu()
+    }
+
+    const text = node as Text
+    const offset = selection.anchorOffset
+    const before = text.data.slice(0, offset)
     const slash = before.lastIndexOf('/')
 
-    // `/` 뒤에 띄어쓰기나 줄바꿈이 오면 그냥 글자로 본다 ("9/1 시험")
-    if (slash === -1 || /\s/.test(before.slice(slash + 1))) {
-      closeMenu()
-      return
-    }
-    setSlashAt(slash)
+    // `/` 뒤에 띄어쓰기가 오면 그냥 글자로 본다 ("9/1 시험")
+    if (slash === -1 || /\s/.test(before.slice(slash + 1))) return closeMenu()
+
+    slashRef.current = { node: text, from: slash, to: offset }
     setQuery(before.slice(slash + 1))
     setActive(0)
-    setMenuLine(before.split('\n').length - 1)
+
+    const rect = selection.getRangeAt(0).getBoundingClientRect()
+    setMenuAt({ top: rect.bottom + 4, left: rect.left })
   }
 
-  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
-    const el = e.currentTarget
-    grow(el)
-
+  function handleInput() {
+    setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
     /*
-     * 일부 모바일 브라우저는 input 이벤트가 난 시점에 커서 위치(selectionStart)를
-     * 아직 갱신하지 않는다. 그대로 읽으면 "커서 앞에 아무것도 없다"고 나와서
-     * `/` 를 쳐도 메뉴가 열리지 않았다. 한 프레임 뒤에 읽는다.
+     * 일부 모바일 브라우저는 입력이 끝난 시점에 커서 위치를 아직 갱신하지 않는다.
+     * 그대로 읽으면 "커서 앞에 아무것도 없다"고 나와 `/` 를 쳐도 안 열렸다.
      */
-    requestAnimationFrame(() => {
-      if (areaRef.current === el) syncMenu(el)
-    })
+    requestAnimationFrame(syncMenu)
   }
 
-  /** 고른 꾸미기를 지금 커서 자리에 적용한다 */
-  function apply(option: Option, slashRange?: { from: number; to: number }) {
-    const el = areaRef.current
-    if (!el) return
+  function run(option: Option) {
+    const root = editorRef.current
+    if (!root) return
+    root.focus()
 
-    if (slashRange) {
-      // 입력한 `/명령어` 를 지운다. 폼 초기화(reset)가 계속 되게 값만 직접 손댄다.
-      const insert = option.insert ?? ''
-      el.value =
-        el.value.slice(0, slashRange.from) + insert + el.value.slice(slashRange.to)
-      const at = slashRange.from + insert.length
-      el.setSelectionRange(at, at)
-    } else if (option.insert) {
-      const from = el.selectionStart
-      const to = el.selectionEnd
-      el.value = el.value.slice(0, from) + option.insert + el.value.slice(to)
-      const at = from + option.insert.length
-      el.setSelectionRange(at, at)
+    // `/명령어` 로 열었으면 그 글자부터 지운다
+    const slash = slashRef.current
+    if (slash) {
+      try {
+        slash.node.deleteData(slash.from, slash.to - slash.from)
+        const range = document.createRange()
+        range.setStart(slash.node, slash.from)
+        range.collapse(true)
+        const selection = window.getSelection()
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+      } catch {
+        // 그 사이 글이 바뀌어 자리를 못 찾은 경우. 명령은 그대로 진행한다.
+      }
+    }
+    closeMenu()
+
+    // 서식을 태그가 아니라 style 로 남긴다. 저장할 때 걸러내기 쉽다.
+    document.execCommand('styleWithCSS', false, 'true')
+
+    const command = option.command
+    if (command.kind === 'insert') {
+      document.execCommand('insertText', false, command.text)
+    } else if (command.kind === 'exec') {
+      document.execCommand(command.name, false, command.value)
+    } else {
+      wrapFontSize(command.px)
     }
 
-    if (option.apply) setDraft(option.apply(draft))
-    closeMenu()
-    grow(el)
-    el.focus()
+    setEmpty(isBlank(root.innerHTML))
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function handleKeyDown(e: React.KeyboardEvent) {
     if (!slashOpen) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -294,45 +312,42 @@ export function PaperBlock({
     } else if (e.key === 'Enter' || e.key === 'Tab') {
       // 메뉴가 열려 있을 때의 Enter는 줄바꿈이 아니라 "이걸로 고름"이다
       e.preventDefault()
-      const el = areaRef.current
-      if (el && slashAt !== null) {
-        apply(matches[active], { from: slashAt, to: el.selectionStart })
-      }
+      run(matches[active])
     } else if (e.key === 'Escape') {
       e.preventDefault()
       closeMenu()
     }
   }
 
-  /** 그려둔 네모를 누르면 체크한다. 클릭하면 커서가 그 글자 옆에 선다. */
-  function handleClick(e: React.MouseEvent<HTMLTextAreaElement>) {
-    const el = e.currentTarget
-    const caret = el.selectionStart
-    if (caret !== el.selectionEnd) return
+  /** 그려둔 네모를 누르면 체크한다 */
+  function handleClick() {
+    const selection = window.getSelection()
+    const node = selection?.anchorNode
+    if (!node || node.nodeType !== Node.TEXT_NODE) return
 
-    for (const i of [caret, caret - 1]) {
-      const ch = el.value[i]
+    const text = node as Text
+    const offset = selection!.anchorOffset
+    for (const i of [offset, offset - 1]) {
+      const ch = text.data[i]
       if (ch !== BOX && ch !== CHECKED) continue
-
-      el.value =
-        el.value.slice(0, i) +
-        (ch === BOX ? CHECKED : BOX) +
-        el.value.slice(i + 1)
-      el.setSelectionRange(i + 1, i + 1)
-      saved.current = el.value
-      el.form?.requestSubmit()
+      text.replaceData(i, 1, ch === BOX ? CHECKED : BOX)
+      save()
       return
     }
   }
 
-  function save(el: HTMLTextAreaElement) {
-    if (el.value === saved.current) return
-    saved.current = el.value
-    el.form?.requestSubmit()
+  function save() {
+    const root = editorRef.current
+    const hidden = hiddenRef.current
+    if (!root || !hidden) return
+    if (root.innerHTML === saved.current) return
+
+    saved.current = root.innerHTML
+    hidden.value = root.innerHTML
+    hidden.form?.requestSubmit()
   }
 
   const rowHeight = lineHeight ?? 28
-  // 폰에서는 칸을 누르면 화면 위에 꾸미기 줄이 뜬다
   const showMobileBar = narrow && focused
 
   return (
@@ -340,46 +355,64 @@ export function PaperBlock({
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
-      <input type="hidden" name="color" value={draft.color} />
-      <input type="hidden" name="style" value={JSON.stringify(draft.style)} />
+      <input type="hidden" name="color" value={color ?? ''} />
+      <input type="hidden" name="style" value={JSON.stringify(style ?? {})} />
+      <input ref={hiddenRef} type="hidden" name="content" defaultValue="" />
 
-      <textarea
-        ref={(el) => {
-          areaRef.current = el
-          if (el) grow(el)
-        }}
-        name="content"
-        defaultValue={content}
-        placeholder={placeholder}
-        aria-label={placeholder || '적는 곳'}
-        spellCheck={false}
-        maxLength={5000}
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        onClick={handleClick}
-        onFocus={() => setFocused(true)}
-        onBlur={(e) => {
-          setFocused(false)
-          closeMenu()
-          save(e.currentTarget)
-        }}
-        style={{
-          minHeight: `${minRows * rowHeight}px`,
-          lineHeight: `${rowHeight}px`,
-          textIndent: firstLineIndent ? `${firstLineIndent}px` : undefined,
-          color: draft.color,
-          fontWeight: draft.style.bold ? 700 : undefined,
-          fontStyle: draft.style.italic ? 'italic' : undefined,
-          fontSize: draft.style.size
-            ? `${SIZES[draft.style.size]}px`
-            : `${fontSize}px`,
-          backgroundColor: draft.style.highlight ? HIGHLIGHT : undefined,
-          // 줄 간격이 칸마다 달라서 괘선을 여기서 직접 그린다.
-          // 글자가 앉는 자리 바로 밑(줄 아래에서 6px 위)에 긋는다.
-          backgroundImage: ruled ? ruledGradient(rowHeight) : undefined,
-        }}
-        className="w-full resize-none overflow-hidden bg-transparent p-0 outline-none placeholder:text-ink-faint/50"
-      />
+      <div className="relative">
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          aria-label={placeholder || '적는 곳'}
+          spellCheck={false}
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          onClick={handleClick}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false)
+            closeMenu()
+            save()
+          }}
+          /*
+           * 붙여넣기는 글자만 받는다.
+           * 웹에서 복사한 것을 그대로 두면 남의 서식과 태그가 통째로 들어온다.
+           */
+          onPaste={(e) => {
+            e.preventDefault()
+            const text = e.clipboardData.getData('text/plain')
+            document.execCommand('insertText', false, text)
+            setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
+          }}
+          dangerouslySetInnerHTML={{ __html: toDisplayHtml(content) }}
+          style={{
+            minHeight: `${minRows * rowHeight}px`,
+            lineHeight: `${rowHeight}px`,
+            textIndent: firstLineIndent ? `${firstLineIndent}px` : undefined,
+            color: color ?? undefined,
+            fontSize: `${fontSize}px`,
+            backgroundImage: ruled ? ruledGradient(rowHeight) : undefined,
+          }}
+          className="w-full break-words whitespace-pre-wrap outline-none"
+        />
+
+        {empty && placeholder && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-0 left-0 text-ink-faint/50"
+            style={{
+              lineHeight: `${rowHeight}px`,
+              fontSize: `${fontSize}px`,
+              textIndent: firstLineIndent ? `${firstLineIndent}px` : undefined,
+            }}
+          >
+            {placeholder}
+          </span>
+        )}
+      </div>
 
       {/* 폰 — 화면 맨 위 꾸미기 줄. 키보드가 올라와도 가리지 않는다 */}
       {showMobileBar && (
@@ -393,16 +426,14 @@ export function PaperBlock({
               key={option.key}
               type="button"
               aria-label={option.label}
-              title={option.label}
               /*
                * click 이 아니라 pointerdown 에서 처리한다.
-               * 커서가 빠지지 않게 preventDefault 를 해야 하는데,
-               * 모바일에서 pointerdown 을 막으면 뒤따라오는 click 까지
-               * 같이 취소된다. 그래서 click 을 기다리면 아무 일도 안 일어난다.
+               * 커서가 빠지지 않게 preventDefault 를 해야 하는데, 모바일에서
+               * pointerdown 을 막으면 뒤따라오는 click 까지 같이 취소된다.
                */
               onPointerDown={(e) => {
                 e.preventDefault()
-                apply(option)
+                run(option)
               }}
               className="flex shrink-0 items-center gap-1 rounded-[3px] border border-ink/15 bg-paper px-2 py-1.5 text-[11px] whitespace-nowrap text-ink-soft active:bg-frame"
             >
@@ -415,13 +446,13 @@ export function PaperBlock({
         </div>
       )}
 
-      {/* 컴퓨터 — 적던 줄 바로 아래 */}
+      {/* 컴퓨터 — 커서 바로 아래. 칸이 좁아도 잘리지 않게 화면 기준으로 띄운다 */}
       {slashOpen && !narrow && (
         <ul
           role="listbox"
           aria-label="꾸미기"
-          style={{ top: `${(menuLine + 1) * rowHeight}px` }}
-          className="absolute left-0 z-30 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook"
+          style={{ top: `${menuAt.top}px`, left: `${menuAt.left}px` }}
+          className="fixed z-50 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook"
         >
           {matches.map((option, i) => (
             <li key={option.key}>
@@ -430,12 +461,7 @@ export function PaperBlock({
                 role="option"
                 aria-selected={i === active}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  const el = areaRef.current
-                  if (el && slashAt !== null) {
-                    apply(option, { from: slashAt, to: el.selectionStart })
-                  }
-                }}
+                onClick={() => run(option)}
                 onMouseEnter={() => setActive(i)}
                 className={`flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px] ${
                   i === active ? 'bg-frame/60 text-ink' : 'text-ink-soft'
