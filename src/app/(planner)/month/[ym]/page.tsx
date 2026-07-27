@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { CalendarCell } from '@/components/calendar-cell'
 import { ItemList } from '@/components/item-list'
 import { TallyMark } from '@/components/tally-mark'
 import {
@@ -31,6 +32,7 @@ export default async function MonthPage({ params }: Params) {
   const rangeEnd = grid[grid.length - 1][6]
   const firstDay = monthFirstDay(ym)
   const today = todayISO()
+  const path = `/month/${ym}`
 
   const supabase = await createClient()
   const {
@@ -38,7 +40,7 @@ export default async function MonthPage({ params }: Params) {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  // 달력에 그릴 것(일정·할일)과 왼쪽 단에 그릴 것(이 달 할 일)을 한 번에 가져온다
+  // 달력에 그릴 것(일정·할일)과 왼쪽 단에 그릴 것(이 달 메모)을 한 번에 가져온다
   const [{ data: calendarData }, { data: monthData }] = await Promise.all([
     supabase
       .from('items')
@@ -46,6 +48,7 @@ export default async function MonthPage({ params }: Params) {
       .in('kind', ['event', 'task'])
       .gte('date', rangeStart)
       .lte('date', rangeEnd)
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true }),
     supabase
       .from('items')
@@ -80,11 +83,12 @@ export default async function MonthPage({ params }: Params) {
       <aside className="flex shrink-0 flex-col border-b border-rule bg-frame/30 px-3 py-4 md:w-40 md:border-r md:border-b-0">
         <h1 className="mb-3 text-2xl font-bold text-ink">{monthLabel(ym)}</h1>
 
+        {/* 여기는 자유롭게 적는 칸이다. 체크할 게 생기면 줄마다 네모를 붙인다. */}
         <ItemList
           items={monthItems}
           kind="month"
           date={firstDay}
-          path={`/month/${ym}`}
+          path={path}
           minRows={5}
         />
 
@@ -123,85 +127,26 @@ export default async function MonthPage({ params }: Params) {
                 ›
               </Link>
 
-              {week.map((date) => {
-                const inMonth = isInMonth(date, ym)
-                const isToday = date === today
-                const events = eventsByDate.get(date) ?? []
-                const taskCount = taskCountByDate.get(date) ?? 0
-
-                return (
-                  <div
-                    key={date}
-                    className={`min-h-[76px] min-w-0 flex-1 border-r border-b border-rule p-1 ${
-                      inMonth ? '' : 'bg-desk/50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <Link
-                        href={`/week/${week[0]}`}
-                        className={`grid size-[22px] place-items-center rounded-full text-[12px] leading-none transition-colors ${
-                          isToday
-                            ? 'bg-today font-bold text-paper'
-                            : inMonth
-                              ? 'text-ink-soft hover:bg-frame/60'
-                              : 'text-ink-faint/60'
-                        }`}
-                      >
-                        {dayNumber(date)}
-                      </Link>
-
-                      {/* 자잘한 할 일 개수를 점으로 (DESIGN.md §5-3) */}
-                      {taskCount > 0 && (
-                        <span
-                          className="flex gap-[2px] pt-1.5"
-                          aria-label={`할 일 ${taskCount}개`}
-                        >
-                          {Array.from(
-                            { length: Math.min(taskCount, 3) },
-                            (_, i) => (
-                              <span
-                                key={i}
-                                className="size-[3px] rounded-full bg-ink-faint"
-                              />
-                            ),
-                          )}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 중요 일정 — 색 띠 + 제목. 최대 2개까지만 보이고 나머지는 접는다 */}
-                    <div className="mt-0.5 flex flex-col gap-[2px]">
-                      {events.slice(0, 2).map((event) => (
-                        <div
-                          key={event.id}
-                          className="flex items-center gap-1 truncate text-[11px] leading-tight font-semibold text-ink"
-                          title={event.content}
-                        >
-                          <span
-                            className="h-[9px] w-[3px] shrink-0"
-                            style={{
-                              backgroundColor: event.color ?? '#C1453C',
-                            }}
-                          />
-                          <span className="truncate">{event.content}</span>
-                        </div>
-                      ))}
-                      {events.length > 2 && (
-                        <span className="text-[10px] text-ink-faint">
-                          +{events.length - 2}개
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+              {week.map((date) => (
+                <CalendarCell
+                  key={date}
+                  date={date}
+                  weekStart={week[0]}
+                  events={eventsByDate.get(date) ?? []}
+                  taskCount={taskCountByDate.get(date) ?? 0}
+                  isToday={date === today}
+                  inMonth={isInMonth(date, ym)}
+                  path={path}
+                />
+              ))}
             </div>
           ))}
         </div>
 
         <p className="mt-2 text-[11px] text-ink-faint">
-          왼쪽 <span className="text-accent">›</span> 또는 날짜를 누르면 그 주의
-          주간 페이지로 갑니다.
+          칸을 누르면 날짜 옆에 바로 적을 수 있습니다. 왼쪽{' '}
+          <span className="text-accent">›</span> 나 날짜를 누르면 그 주의 주간
+          페이지로 갑니다.
         </p>
       </div>
     </div>

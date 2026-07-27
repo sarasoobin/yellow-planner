@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- 손으로 그린 듯 꼭짓점이 살짝 어긋난 별 -->
+  <path
+    d="M12 2.9 14.6 8.5 20.8 9.3 16.2 13.5 17.4 19.7 12 16.6 6.5 19.6 7.8 13.4 3.3 9.2 9.5 8.5Z"
+    stroke="#C1453C"
+    stroke-width="1.6"
+    stroke-linejoin="round"
+    fill="#C1453C"
+    fill-opacity="0.16"
+  />
+</svg>

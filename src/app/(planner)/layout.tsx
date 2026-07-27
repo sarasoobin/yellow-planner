@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { signOut } from '@/lib/actions/auth'
 import { IndexTabs } from '@/components/index-tabs'
-import { PenPicker, PenProvider } from '@/components/pen'
+import { Toolbar, ToolProvider } from '@/components/toolbar'
 
 /**
  * 노트 껍데기. 표지·월간·주간·메모가 전부 이 안에 들어간다.
@@ -23,8 +23,8 @@ export default async function PlannerLayout({
   const currentYear = new Date().getFullYear()
 
   return (
-    // 펜은 헤더(고르는 곳)와 본문(적는 곳)이 함께 알아야 해서 둘을 같이 감싼다
-    <PenProvider>
+    // 도구는 헤더(고르는 곳)와 본문(적는 곳)이 함께 알아야 해서 둘을 같이 감싼다
+    <ToolProvider>
       <div className="min-h-full bg-desk px-3 py-4 md:px-6 md:py-10">
         <div className="mx-auto flex w-full max-w-5xl items-stretch">
           {/* 노트 본체 */}
@@ -42,8 +42,8 @@ export default async function PlannerLayout({
                 </span>
               </Link>
 
-              {/* 펜꽂이 — 고른 색으로 다음에 적는 글이 저장된다 */}
-              <PenPicker />
+              {/* 필통 — 여기서 고른 도구로 다음에 적는 글이 저장된다 */}
+              <Toolbar />
 
               <div className="flex shrink-0 items-center gap-3 text-xs text-ink-soft">
                 <span className="hidden max-w-[16ch] truncate md:inline">
@@ -73,6 +73,6 @@ export default async function PlannerLayout({
           <IndexTabs orientation="side" currentYear={currentYear} />
         </div>
       </div>
-    </PenProvider>
+    </ToolProvider>
   )
 }

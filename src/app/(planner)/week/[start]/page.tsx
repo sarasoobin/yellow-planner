@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { DailyLine } from '@/components/daily-line'
 import { ItemList } from '@/components/item-list'
 import { NoteEditor } from '@/components/note-editor'
+import { Sticker, writtenStyle } from '@/components/written'
 import {
   WEEKDAY_LABELS,
   dayNumber,
@@ -131,13 +132,23 @@ export default async function WeekPage({ params }: Params) {
                     {events.map((event) => (
                       <div
                         key={event.id}
-                        className="flex items-center gap-1.5 text-[12px] leading-tight font-semibold text-ink"
+                        className="flex items-center gap-1 text-[12px] leading-tight"
+                        title={event.content}
                       >
                         <span
+                          aria-hidden
                           className="h-3 w-[3px] shrink-0"
                           style={{ backgroundColor: event.color ?? '#C1453C' }}
                         />
-                        <span className="truncate" title={event.content}>
+                        <Sticker name={event.style?.sticker} />
+                        <span
+                          className="truncate"
+                          style={writtenStyle(
+                            event.color,
+                            event.style,
+                            event.is_done,
+                          )}
+                        >
                           {event.content}
                         </span>
                       </div>

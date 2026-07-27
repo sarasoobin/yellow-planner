@@ -2,7 +2,8 @@
 
 import { useActionState } from 'react'
 import { saveDaily } from '@/lib/actions/items'
-import { usePenHex } from '@/components/pen'
+import { useTool } from '@/components/toolbar'
+import { writtenStyle } from '@/components/written'
 import type { FormState, Item } from '@/lib/types'
 
 const EMPTY: FormState = { error: null }
@@ -24,16 +25,18 @@ export function DailyLine({
   path: string
 }) {
   const [state, formAction] = useActionState(saveDaily, EMPTY)
-  const penHex = usePenHex()
+  const tool = useTool()
   const saved = item?.content ?? ''
-  // 이미 적힌 줄은 그때 쓴 펜 색을 지키고, 새로 적을 때는 지금 든 펜을 쓴다
-  const hex = item?.color ?? penHex
+  // 이미 적힌 줄은 그때 쓴 도구를 지키고, 새로 적을 때는 지금 쥔 도구를 쓴다
+  const hex = item?.color ?? tool.hex
+  const style = item?.style ?? tool.style
 
   return (
     <form action={formAction} className="flex min-w-0 flex-1">
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
       <input type="hidden" name="color" value={hex} />
+      <input type="hidden" name="style" value={JSON.stringify(style)} />
       {item && <input type="hidden" name="id" value={item.id} />}
 
       <input
@@ -47,9 +50,11 @@ export function DailyLine({
             e.currentTarget.form?.requestSubmit()
           }
         }}
-        style={state.error ? undefined : { color: hex }}
+        style={state.error ? undefined : writtenStyle(hex, style, false)}
         className={`min-w-0 flex-1 border-b border-dotted bg-transparent pb-px text-[11px] outline-none transition-colors ${
-          state.error ? 'border-danger text-danger' : 'border-rule focus:border-accent'
+          state.error
+            ? 'border-danger text-danger'
+            : 'border-rule focus:border-accent'
         }`}
       />
     </form>

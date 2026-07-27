@@ -5,11 +5,13 @@ import {
   createItem,
   deleteItem,
   reorderItems,
+  setItemCheck,
   toggleItem,
   updateItem,
 } from '@/lib/actions/items'
-import { usePenHex } from '@/components/pen'
-import type { FormState, Item, ItemKind } from '@/lib/types'
+import { useTool } from '@/components/toolbar'
+import { CheckMark, Sticker, writtenStyle } from '@/components/written'
+import { defaultCheck, type FormState, type Item, type ItemKind } from '@/lib/types'
 
 const EMPTY: FormState = { error: null }
 
@@ -31,19 +33,8 @@ type Props = {
  */
 const ROW = 'flex h-line items-end gap-2 border-b border-rule pb-[3px]'
 
-/** 종이에 그린 네모 체크박스 */
-function Box({ checked }: { checked?: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={`grid size-[13px] shrink-0 place-items-center border text-[9px] leading-none ${
-        checked ? 'border-done text-done' : 'border-rule text-transparent'
-      }`}
-    >
-      ✓
-    </span>
-  )
-}
+/** 체크박스 자리. 네모가 없는 줄도 이 폭을 비워둬야 글머리가 나란해진다. */
+const SLOT = 'relative size-[13px] shrink-0'
 
 export function ItemList({
   items,
@@ -83,8 +74,7 @@ export function ItemList({
   }, [items, from, to])
 
   function startDrag(index: number, event: React.PointerEvent) {
-    const rows = listRef.current?.children
-    const first = rows?.[0] as HTMLElement | undefined
+    const first = listRef.current?.children[0] as HTMLElement | undefined
     if (!first) return
 
     const rect = first.getBoundingClientRect()
@@ -128,6 +118,7 @@ export function ItemList({
           <ItemRow
             key={item.id}
             item={item}
+            kind={kind}
             path={path}
             dragging={from !== null && to === index}
             onDragStart={(event) => startDrag(index, event)}
@@ -148,7 +139,7 @@ export function ItemList({
 
         {Array.from({ length: Math.max(blankRows - 1, 0) }, (_, i) => (
           <li key={`blank-${i}`} className={ROW}>
-            <Box />
+            <span className={SLOT} />
           </li>
         ))}
       </ul>
@@ -172,9 +163,13 @@ function AddItemForm({
   placeholder,
 }: Pick<Props, 'kind' | 'date' | 'path'> & { placeholder: string }) {
   const [state, formAction, pending] = useActionState(createItem, EMPTY)
-  const penHex = usePenHex()
+  const { hex, style } = useTool()
   const formRef = useRef<HTMLFormElement>(null)
   const handled = useRef<FormState | null>(null)
+
+  // 새 줄에 네모를 그릴지는 어디에 적느냐로 정한다. 나중에 줄마다 바꿀 수 있다.
+  const withBox = defaultCheck(kind)
+  const nextStyle = { ...style, check: withBox }
 
   // 저장에 성공하면 입력칸을 비워 다음 줄을 바로 적을 수 있게 한다
   useEffect(() => {
@@ -191,15 +186,21 @@ function AddItemForm({
     <form
       ref={formRef}
       action={formAction}
-      className="flex w-full items-center gap-2"
+      className="flex w-full items-end gap-2"
     >
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
-      {/* 지금 고른 펜 색으로 저장된다 */}
-      <input type="hidden" name="color" value={penHex} />
+      {/* 지금 쥔 도구가 그대로 저장된다 */}
+      <input type="hidden" name="color" value={hex} />
+      <input type="hidden" name="style" value={JSON.stringify(nextStyle)} />
 
-      <Box />
+      <span className={SLOT}>
+        {withBox && (
+          <span aria-hidden className="block size-[13px] border border-rule" />
+        )}
+      </span>
+
       <input
         name="content"
         required
@@ -207,8 +208,9 @@ function AddItemForm({
         placeholder={placeholder}
         aria-label={placeholder || '새 항목'}
         disabled={pending}
-        style={{ color: penHex }}
-        className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-faint/60 disabled:opacity-50"
+        // 지금 고른 도구로 미리 보여준다
+        style={writtenStyle(hex, style, false)}
+        className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:bg-transparent placeholder:font-normal placeholder:text-ink-faint/60 disabled:opacity-50"
       />
 
       {state.error && (
@@ -222,6 +224,7 @@ function AddItemForm({
 
 function ItemRow({
   item,
+  kind,
   path,
   dragging,
   onDragStart,
@@ -229,6 +232,7 @@ function ItemRow({
   onDragEnd,
 }: {
   item: Item
+  kind: ItemKind
   path: string
   dragging: boolean
   onDragStart: (event: React.PointerEvent) => void
@@ -236,32 +240,28 @@ function ItemRow({
   onDragEnd: () => void
 }) {
   const [editing, setEditing] = useState(false)
+  const hasBox = item.style?.check ?? defaultCheck(kind)
 
   return (
-    <li
-      className={`group ${ROW} ${dragging ? 'bg-frame/40' : ''}`}
-      data-dragging={dragging || undefined}
-    >
-      {/* 완료 토글 */}
-      <form action={toggleItem} className="flex shrink-0">
-        <input type="hidden" name="id" value={item.id} />
-        <input type="hidden" name="is_done" value={String(item.is_done)} />
-        <input type="hidden" name="path" value={path} />
-        <button
-          type="submit"
-          aria-pressed={item.is_done}
-          aria-label={`${item.content} ${item.is_done ? '완료 취소' : '완료'}`}
-          // 체크박스도 그때 쓴 펜으로 그린 것처럼 같은 색을 옅게 쓴다
-          style={
-            !item.is_done && item.color
-              ? { borderColor: `${item.color}66` }
-              : undefined
-          }
-          className="grid size-[13px] cursor-pointer place-items-center border border-rule text-[9px] leading-none text-done transition-colors hover:border-done"
-        >
-          {item.is_done ? '✓' : ''}
-        </button>
-      </form>
+    <li className={`group ${ROW} ${dragging ? 'bg-frame/40' : ''}`}>
+      <span className={SLOT}>
+        {hasBox && (
+          <form action={toggleItem} className="flex">
+            <input type="hidden" name="id" value={item.id} />
+            <input type="hidden" name="is_done" value={String(item.is_done)} />
+            <input type="hidden" name="path" value={path} />
+            <button
+              type="submit"
+              aria-pressed={item.is_done}
+              aria-label={`${item.content} ${item.is_done ? '완료 취소' : '완료'}`}
+              // 체크박스도 그때 쓴 펜으로 그린 것처럼 같은 색을 옅게 쓴다
+              style={item.color ? { borderColor: `${item.color}66` } : undefined}
+              className="block size-[13px] cursor-pointer border border-rule transition-colors hover:border-today"
+            />
+          </form>
+        )}
+        {hasBox && item.is_done && <CheckMark />}
+      </span>
 
       {editing ? (
         <EditItemForm
@@ -274,41 +274,62 @@ function ItemRow({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            // 완료한 줄은 색을 버리고 흐리게 — 지운 것처럼 보여야 한다
-            style={
-              !item.is_done && item.color ? { color: item.color } : undefined
-            }
-            className={`min-w-0 flex-1 cursor-text truncate text-left text-[14px] ${
-              item.is_done ? 'text-ink-faint line-through' : 'text-ink-soft'
-            }`}
+            className="flex min-w-0 flex-1 cursor-text items-center gap-1 text-left text-[14px]"
           >
-            {item.content}
-          </button>
-
-          {/* 순서 바꾸기 손잡이. 폰에서는 hover가 없어 항상 보인다. */}
-          <button
-            type="button"
-            aria-label={`${item.content} 순서 바꾸기`}
-            onPointerDown={onDragStart}
-            onPointerMove={onDragMove}
-            onPointerUp={onDragEnd}
-            onPointerCancel={onDragEnd}
-            className="shrink-0 cursor-grab touch-none px-0.5 text-[11px] leading-none text-ink-faint/60 transition-opacity active:cursor-grabbing md:opacity-0 md:group-hover:opacity-100"
-          >
-            ⠿
-          </button>
-
-          <form action={deleteItem} className="flex shrink-0">
-            <input type="hidden" name="id" value={item.id} />
-            <input type="hidden" name="path" value={path} />
-            <button
-              type="submit"
-              aria-label={`${item.content} 삭제`}
-              className="cursor-pointer px-0.5 text-xs text-ink-faint/60 opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger focus:opacity-100"
+            <Sticker name={item.style?.sticker} />
+            <span
+              className="truncate"
+              style={writtenStyle(item.color, item.style, item.is_done)}
             >
-              ✕
+              {item.content}
+            </span>
+          </button>
+
+          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 md:opacity-0">
+            {/* 이 줄에만 네모를 붙이거나 뗀다 */}
+            <form action={setItemCheck} className="flex">
+              <input type="hidden" name="id" value={item.id} />
+              <input type="hidden" name="path" value={path} />
+              <input type="hidden" name="check" value={String(!hasBox)} />
+              <button
+                type="submit"
+                aria-label={hasBox ? '체크박스 떼기' : '체크박스 붙이기'}
+                title={hasBox ? '체크박스 떼기' : '체크박스 붙이기'}
+                className={`px-0.5 text-[11px] leading-none transition-colors ${
+                  hasBox
+                    ? 'text-accent hover:text-danger'
+                    : 'text-ink-faint/60 hover:text-accent'
+                }`}
+              >
+                ☐
+              </button>
+            </form>
+
+            {/* 순서 바꾸기 손잡이 */}
+            <button
+              type="button"
+              aria-label={`${item.content} 순서 바꾸기`}
+              onPointerDown={onDragStart}
+              onPointerMove={onDragMove}
+              onPointerUp={onDragEnd}
+              onPointerCancel={onDragEnd}
+              className="cursor-grab touch-none px-0.5 text-[11px] leading-none text-ink-faint/60 active:cursor-grabbing"
+            >
+              ⠿
             </button>
-          </form>
+
+            <form action={deleteItem} className="flex">
+              <input type="hidden" name="id" value={item.id} />
+              <input type="hidden" name="path" value={path} />
+              <button
+                type="submit"
+                aria-label={`${item.content} 삭제`}
+                className="px-0.5 text-xs leading-none text-ink-faint/60 hover:text-danger"
+              >
+                ✕
+              </button>
+            </form>
+          </div>
         </>
       )}
     </li>
@@ -338,7 +359,7 @@ function EditItemForm({
   }, [state, onDone])
 
   return (
-    <form action={formAction} className="flex min-w-0 flex-1 items-center gap-1">
+    <form action={formAction} className="flex min-w-0 flex-1 items-end gap-1">
       <input type="hidden" name="id" value={item.id} />
       <input type="hidden" name="path" value={path} />
       <input
@@ -356,8 +377,8 @@ function EditItemForm({
           if (e.currentTarget.value.trim() === item.content) onDone()
           else e.currentTarget.form?.requestSubmit()
         }}
-        style={item.color ? { color: item.color } : undefined}
-        className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none"
+        style={writtenStyle(item.color, item.style, false)}
+        className="min-w-0 flex-1 bg-transparent text-[14px] outline-none"
       />
       {state.error && (
         <span role="alert" className="shrink-0 text-[10px] text-danger">

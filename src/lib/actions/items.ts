@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { ITEM_KINDS, type FormState } from '@/lib/types'
+import { ITEM_KINDS, type FormState, type ItemStyle } from '@/lib/types'
 
 /**
  * 적은 것(items)에 대한 생성/수정/토글/삭제.
@@ -32,6 +32,29 @@ const createSchema = z.object({
     .max(200, '200자까지 입력할 수 있습니다.'),
   color: HEX.nullable(),
 })
+
+/**
+ * 꾸미기. 폼에서 JSON 문자열로 넘어온다.
+ * 모르는 키는 버리고, 형식이 틀리면 꾸미기 없이 저장한다.
+ * 꾸미기 때문에 글 자체가 저장 안 되는 일은 없어야 한다.
+ */
+const STYLE = z.object({
+  bold: z.boolean().optional(),
+  italic: z.boolean().optional(),
+  highlight: z.boolean().optional(),
+  check: z.boolean().optional(),
+  sticker: z.string().max(32).nullable().optional(),
+})
+
+function parseStyle(raw: FormDataEntryValue | null): ItemStyle {
+  if (typeof raw !== 'string' || !raw) return {}
+  try {
+    const parsed = STYLE.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : {}
+  } catch {
+    return {}
+  }
+}
 
 /** 화면을 새로 그릴 경로. 액션마다 어디서 불렸는지 달라서 폼에서 함께 넘긴다. */
 function revalidateFrom(formData: FormData) {
@@ -75,6 +98,7 @@ export async function createItem(
     ...parsed.data,
     user_id: user.id,
     sort_order: (last?.sort_order ?? -1) + 1,
+    style: parseStyle(formData.get('style')),
   })
 
   if (error) return { error: '저장하지 못했습니다. 잠시 후 다시 시도해주세요.' }
@@ -113,6 +137,32 @@ export async function updateItem(
 
   revalidateFrom(formData)
   return { error: null }
+}
+
+/**
+ * 한 줄에 체크박스를 붙이거나 뗀다.
+ *
+ * 달력이나 이 달 메모처럼 그냥 적는 곳에서도 가끔은 체크할 게 생긴다.
+ * 목록 전체가 아니라 줄 하나만 바꾼다.
+ */
+export async function setItemCheck(formData: FormData) {
+  const id = String(formData.get('id') ?? '')
+  if (!id) return
+  const next = formData.get('check') === 'true'
+
+  const supabase = await createClient()
+
+  // style 을 통째로 덮어쓰면 굵게·스티커까지 날아간다. 기존 값에 얹는다.
+  const { data } = await supabase
+    .from('items')
+    .select('style')
+    .eq('id', id)
+    .maybeSingle()
+
+  const merged = { ...((data?.style as ItemStyle) ?? {}), check: next }
+  await supabase.from('items').update({ style: merged }).eq('id', id)
+
+  revalidateFrom(formData)
 }
 
 /**
@@ -167,10 +217,12 @@ export async function saveDaily(
   const parsedColor = HEX.safeParse(formData.get('color'))
   const color = parsedColor.success ? parsedColor.data : null
 
+  const style = parseStyle(formData.get('style'))
+
   if (id) {
     const { error } = await supabase
       .from('items')
-      .update({ content, color })
+      .update({ content, color, style })
       .eq('id', id)
     if (error) return { error: '저장하지 못했습니다.' }
   } else {
@@ -184,6 +236,7 @@ export async function saveDaily(
       date: date.data,
       content,
       color,
+      style,
       user_id: user.id,
     })
     if (error) return { error: '저장하지 못했습니다.' }

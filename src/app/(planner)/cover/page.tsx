@@ -32,12 +32,8 @@ export default async function CoverPage() {
   const doneCount = items.filter((i) => i.is_done).length
 
   return (
-    // 표지는 책의 시작이라 종이 대신 표지색으로 꽉 채운다.
-    // 노란 바탕에서는 기본 괘선이 묻혀서 줄 색만 한 톤 진하게 바꾼다.
-    <div
-      className="flex flex-1 flex-col items-center justify-center bg-frame px-6 py-12"
-      style={{ '--color-rule': '#E0C35F' } as React.CSSProperties}
-    >
+    // 가운데는 다른 페이지와 같은 종이색. 노란 표지는 바깥 프레임이 맡는다.
+    <div className="flex flex-1 flex-col items-center justify-center bg-paper px-6 py-12">
       <p className="text-6xl leading-none font-bold tracking-tight text-ink md:text-7xl">
         {year}
       </p>
@@ -48,7 +44,7 @@ export default async function CoverPage() {
             올해의 목표
           </h1>
           {items.length > 0 && (
-            <span className="text-xs text-ink/55">
+            <span className="text-xs text-ink-faint">
               {items.length}개 중 {doneCount}개
             </span>
           )}

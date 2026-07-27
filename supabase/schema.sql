@@ -65,6 +65,11 @@ create table public.items (
   color      text check (color is null or color ~ '^#[0-9A-Fa-f]{6}$'),
   sort_order integer not null default 0,
 
+  -- 꾸미기와 스티커. 컬럼을 여러 개 두는 대신 jsonb 하나로 모은다.
+  -- { bold, italic, highlight, check, sticker } — 없으면 기본값으로 본다.
+  style      jsonb not null default '{}'::jsonb
+               constraint items_style_object check (jsonb_typeof(style) = 'object'),
+
   created_at timestamptz not null default now()
 );
 
