@@ -386,8 +386,6 @@ export function PaperBlock({
         <div
           role="toolbar"
           aria-label="꾸미기"
-          // 눌러도 적던 자리에서 커서가 빠지지 않아야 한다
-          onPointerDown={(e) => e.preventDefault()}
           className="fixed inset-x-0 top-0 z-50 flex gap-1 overflow-x-auto border-b border-edge bg-frame px-2 py-1.5 shadow-notebook"
         >
           {OPTIONS.map((option) => (
@@ -396,7 +394,16 @@ export function PaperBlock({
               type="button"
               aria-label={option.label}
               title={option.label}
-              onClick={() => apply(option)}
+              /*
+               * click 이 아니라 pointerdown 에서 처리한다.
+               * 커서가 빠지지 않게 preventDefault 를 해야 하는데,
+               * 모바일에서 pointerdown 을 막으면 뒤따라오는 click 까지
+               * 같이 취소된다. 그래서 click 을 기다리면 아무 일도 안 일어난다.
+               */
+              onPointerDown={(e) => {
+                e.preventDefault()
+                apply(option)
+              }}
               className="flex shrink-0 items-center gap-1 rounded-[3px] border border-ink/15 bg-paper px-2 py-1.5 text-[11px] whitespace-nowrap text-ink-soft active:bg-frame"
             >
               <span className="grid size-4 place-items-center">
