@@ -16,22 +16,18 @@ import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
  * 체크박스는 손으로 그리는 것이라 글자로 넣는다 (☐ / ☑).
  * 그래서 줄 앞이든 문장 중간이든 커서가 있는 자리 어디에나 그릴 수 있다.
  * 그려둔 네모를 누르면 체크되고, 다시 누르면 풀린다.
+ *
+ * 꾸미기는 두 갈래로 연다.
+ *   컴퓨터 — 적던 자리에서 `/`
+ *   폰     — 칸을 누르면 화면 위에 뜨는 꾸미기 줄
+ * 폰에서 `/` 를 치려면 기호 키보드로 넘어가야 해서 그것만으로는 불편하다.
  */
 
 const BOX = '☐'
 const CHECKED = '☑'
 
 /**
- * 공책 괘선.
- *
- * 칸마다 줄 간격이 달라서(달력 칸은 좁다) 클래스 대신 값으로 만든다.
- * CSS 변수를 인라인 style 의 "키"로 넘기면 React가 처리하지 못한다.
- */
-/**
  * 좁은 화면인가.
- *
- * 폰에서는 꾸미기 메뉴를 커서 아래에 띄우면 키보드에 가려 안 보인다.
- * 화면 위쪽에 고정해서 띄우려고 화면 폭을 본다.
  *
  * useEffect + setState 대신 useSyncExternalStore 를 쓴다.
  * 첫 그림에서 이미 맞는 값이라 화면이 한 번 깜빡이지 않는다.
@@ -52,6 +48,12 @@ function useIsNarrow(): boolean {
   )
 }
 
+/**
+ * 공책 괘선.
+ *
+ * 칸마다 줄 간격이 달라서(달력 칸은 좁다) 클래스 대신 값으로 만든다.
+ * CSS 변수를 인라인 style 의 "키"로 넘기면 React가 처리하지 못한다.
+ */
 function ruledGradient(lineHeight: number): string {
   const rule = lineHeight - 6
   return [
@@ -197,6 +199,8 @@ export function PaperBlock({
   const saved = useRef(content)
   const narrow = useIsNarrow()
 
+  const [focused, setFocused] = useState(false)
+
   // `/` 가 시작된 자리. 메뉴에서 고르면 여기부터 커서까지를 지운다.
   const [slashAt, setSlashAt] = useState<number | null>(null)
   const [query, setQuery] = useState('')
@@ -208,7 +212,7 @@ export function PaperBlock({
         (o) => o.label.includes(query) || o.alias.includes(query.toLowerCase()),
       )
     : OPTIONS
-  const open = slashAt !== null && matches.length > 0
+  const slashOpen = slashAt !== null && matches.length > 0
 
   function closeMenu() {
     setSlashAt(null)
@@ -222,10 +226,8 @@ export function PaperBlock({
     el.style.height = `${el.scrollHeight}px`
   }
 
-  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
-    const el = e.currentTarget
-    grow(el)
-
+  /** 커서 앞의 `/명령어` 를 살펴 메뉴를 열거나 닫는다 */
+  function syncMenu(el: HTMLTextAreaElement) {
     const caret = el.selectionStart
     const before = el.value.slice(0, caret)
     const slash = before.lastIndexOf('/')
@@ -241,15 +243,39 @@ export function PaperBlock({
     setMenuLine(before.split('\n').length - 1)
   }
 
-  function choose(option: Option) {
-    const el = areaRef.current
-    if (!el || slashAt === null) return
+  function handleInput(e: React.FormEvent<HTMLTextAreaElement>) {
+    const el = e.currentTarget
+    grow(el)
 
-    const caret = el.selectionStart
-    const insert = option.insert ?? ''
-    el.value = el.value.slice(0, slashAt) + insert + el.value.slice(caret)
-    const at = slashAt + insert.length
-    el.setSelectionRange(at, at)
+    /*
+     * 일부 모바일 브라우저는 input 이벤트가 난 시점에 커서 위치(selectionStart)를
+     * 아직 갱신하지 않는다. 그대로 읽으면 "커서 앞에 아무것도 없다"고 나와서
+     * `/` 를 쳐도 메뉴가 열리지 않았다. 한 프레임 뒤에 읽는다.
+     */
+    requestAnimationFrame(() => {
+      if (areaRef.current === el) syncMenu(el)
+    })
+  }
+
+  /** 고른 꾸미기를 지금 커서 자리에 적용한다 */
+  function apply(option: Option, slashRange?: { from: number; to: number }) {
+    const el = areaRef.current
+    if (!el) return
+
+    if (slashRange) {
+      // 입력한 `/명령어` 를 지운다. 폼 초기화(reset)가 계속 되게 값만 직접 손댄다.
+      const insert = option.insert ?? ''
+      el.value =
+        el.value.slice(0, slashRange.from) + insert + el.value.slice(slashRange.to)
+      const at = slashRange.from + insert.length
+      el.setSelectionRange(at, at)
+    } else if (option.insert) {
+      const from = el.selectionStart
+      const to = el.selectionEnd
+      el.value = el.value.slice(0, from) + option.insert + el.value.slice(to)
+      const at = from + option.insert.length
+      el.setSelectionRange(at, at)
+    }
 
     if (option.apply) setDraft(option.apply(draft))
     closeMenu()
@@ -258,7 +284,7 @@ export function PaperBlock({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (!open) return
+    if (!slashOpen) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setActive((i) => (i + 1) % matches.length)
@@ -268,7 +294,10 @@ export function PaperBlock({
     } else if (e.key === 'Enter' || e.key === 'Tab') {
       // 메뉴가 열려 있을 때의 Enter는 줄바꿈이 아니라 "이걸로 고름"이다
       e.preventDefault()
-      choose(matches[active])
+      const el = areaRef.current
+      if (el && slashAt !== null) {
+        apply(matches[active], { from: slashAt, to: el.selectionStart })
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault()
       closeMenu()
@@ -296,7 +325,15 @@ export function PaperBlock({
     }
   }
 
+  function save(el: HTMLTextAreaElement) {
+    if (el.value === saved.current) return
+    saved.current = el.value
+    el.form?.requestSubmit()
+  }
+
   const rowHeight = lineHeight ?? 28
+  // 폰에서는 칸을 누르면 화면 위에 꾸미기 줄이 뜬다
+  const showMobileBar = narrow && focused
 
   return (
     <form action={formAction} className={`relative flex flex-col ${className}`}>
@@ -320,11 +357,11 @@ export function PaperBlock({
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onClick={handleClick}
+        onFocus={() => setFocused(true)}
         onBlur={(e) => {
+          setFocused(false)
           closeMenu()
-          if (e.currentTarget.value === saved.current) return
-          saved.current = e.currentTarget.value
-          e.currentTarget.form?.requestSubmit()
+          save(e.currentTarget)
         }}
         style={{
           minHeight: `${minRows * rowHeight}px`,
@@ -344,17 +381,40 @@ export function PaperBlock({
         className="w-full resize-none overflow-hidden bg-transparent p-0 outline-none placeholder:text-ink-faint/50"
       />
 
-      {open && (
+      {/* 폰 — 화면 맨 위 꾸미기 줄. 키보드가 올라와도 가리지 않는다 */}
+      {showMobileBar && (
+        <div
+          role="toolbar"
+          aria-label="꾸미기"
+          // 눌러도 적던 자리에서 커서가 빠지지 않아야 한다
+          onPointerDown={(e) => e.preventDefault()}
+          className="fixed inset-x-0 top-0 z-50 flex gap-1 overflow-x-auto border-b border-edge bg-frame px-2 py-1.5 shadow-notebook"
+        >
+          {OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-label={option.label}
+              title={option.label}
+              onClick={() => apply(option)}
+              className="flex shrink-0 items-center gap-1 rounded-[3px] border border-ink/15 bg-paper px-2 py-1.5 text-[11px] whitespace-nowrap text-ink-soft active:bg-frame"
+            >
+              <span className="grid size-4 place-items-center">
+                {option.icon}
+              </span>
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 컴퓨터 — 적던 줄 바로 아래 */}
+      {slashOpen && !narrow && (
         <ul
           role="listbox"
           aria-label="꾸미기"
-          // 폰에서는 커서 아래에 띄우면 키보드에 가린다. 화면 위쪽에 고정한다.
-          style={narrow ? undefined : { top: `${(menuLine + 1) * rowHeight}px` }}
-          className={
-            narrow
-              ? 'fixed top-3 left-1/2 z-50 max-h-[45vh] w-[min(18rem,90vw)] -translate-x-1/2 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook'
-              : 'absolute left-0 z-30 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook'
-          }
+          style={{ top: `${(menuLine + 1) * rowHeight}px` }}
+          className="absolute left-0 z-30 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook"
         >
           {matches.map((option, i) => (
             <li key={option.key}>
@@ -362,12 +422,15 @@ export function PaperBlock({
                 type="button"
                 role="option"
                 aria-selected={i === active}
-                // 눌러도 글 쓰던 자리에서 커서가 빠지지 않아야 한다
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => choose(option)}
+                onClick={() => {
+                  const el = areaRef.current
+                  if (el && slashAt !== null) {
+                    apply(option, { from: slashAt, to: el.selectionStart })
+                  }
+                }}
                 onMouseEnter={() => setActive(i)}
-                // 폰에서는 손가락으로 눌러야 해서 칸을 넉넉히 준다
-                className={`flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-[13px] md:px-2 md:py-1 md:text-[12px] ${
+                className={`flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px] ${
                   i === active ? 'bg-frame/60 text-ink' : 'text-ink-soft'
                 }`}
               >
