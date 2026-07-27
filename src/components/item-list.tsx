@@ -8,6 +8,7 @@ import {
   toggleItem,
   updateItem,
 } from '@/lib/actions/items'
+import { usePenHex } from '@/components/pen'
 import type { FormState, Item, ItemKind } from '@/lib/types'
 
 const EMPTY: FormState = { error: null }
@@ -24,8 +25,11 @@ type Props = {
   placeholder?: string
 }
 
-/** 빈 줄이든 글이 적힌 줄이든 높이가 같아야 괘선이 일정하다 */
-const ROW = 'flex h-line items-center gap-2 border-b border-rule'
+/**
+ * 빈 줄이든 글이 적힌 줄이든 높이가 같아야 괘선이 일정하다.
+ * items-end 로 내용을 아래로 붙여야 글자가 줄 위에 앉는다.
+ */
+const ROW = 'flex h-line items-end gap-2 border-b border-rule pb-[3px]'
 
 /** 종이에 그린 네모 체크박스 */
 function Box({ checked }: { checked?: boolean }) {
@@ -168,6 +172,7 @@ function AddItemForm({
   placeholder,
 }: Pick<Props, 'kind' | 'date' | 'path'> & { placeholder: string }) {
   const [state, formAction, pending] = useActionState(createItem, EMPTY)
+  const penHex = usePenHex()
   const formRef = useRef<HTMLFormElement>(null)
   const handled = useRef<FormState | null>(null)
 
@@ -191,6 +196,8 @@ function AddItemForm({
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
+      {/* 지금 고른 펜 색으로 저장된다 */}
+      <input type="hidden" name="color" value={penHex} />
 
       <Box />
       <input
@@ -200,7 +207,8 @@ function AddItemForm({
         placeholder={placeholder}
         aria-label={placeholder || '새 항목'}
         disabled={pending}
-        className="min-w-0 flex-1 bg-transparent text-sm text-ink-soft outline-none placeholder:text-ink-faint/60 disabled:opacity-50"
+        style={{ color: penHex }}
+        className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-faint/60 disabled:opacity-50"
       />
 
       {state.error && (
@@ -243,6 +251,12 @@ function ItemRow({
           type="submit"
           aria-pressed={item.is_done}
           aria-label={`${item.content} ${item.is_done ? '완료 취소' : '완료'}`}
+          // 체크박스도 그때 쓴 펜으로 그린 것처럼 같은 색을 옅게 쓴다
+          style={
+            !item.is_done && item.color
+              ? { borderColor: `${item.color}66` }
+              : undefined
+          }
           className="grid size-[13px] cursor-pointer place-items-center border border-rule text-[9px] leading-none text-done transition-colors hover:border-done"
         >
           {item.is_done ? '✓' : ''}
@@ -260,7 +274,11 @@ function ItemRow({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className={`min-w-0 flex-1 cursor-text truncate text-left text-sm ${
+            // 완료한 줄은 색을 버리고 흐리게 — 지운 것처럼 보여야 한다
+            style={
+              !item.is_done && item.color ? { color: item.color } : undefined
+            }
+            className={`min-w-0 flex-1 cursor-text truncate text-left text-[14px] ${
               item.is_done ? 'text-ink-faint line-through' : 'text-ink-soft'
             }`}
           >
@@ -338,7 +356,8 @@ function EditItemForm({
           if (e.currentTarget.value.trim() === item.content) onDone()
           else e.currentTarget.form?.requestSubmit()
         }}
-        className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
+        style={item.color ? { color: item.color } : undefined}
+        className="min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none"
       />
       {state.error && (
         <span role="alert" className="shrink-0 text-[10px] text-danger">

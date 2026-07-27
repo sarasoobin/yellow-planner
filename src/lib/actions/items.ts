@@ -17,6 +17,11 @@ const DATE = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, '날짜 형식이 올바르지 않습니다.')
 
+/** 펜 색. DB의 check 제약과 같은 형식이어야 한다. */
+const HEX = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/, '색 형식이 올바르지 않습니다.')
+
 const createSchema = z.object({
   kind: z.enum(ITEM_KINDS),
   date: DATE,
@@ -25,6 +30,7 @@ const createSchema = z.object({
     .trim()
     .min(1, '내용을 입력해주세요.')
     .max(200, '200자까지 입력할 수 있습니다.'),
+  color: HEX.nullable(),
 })
 
 /** 화면을 새로 그릴 경로. 액션마다 어디서 불렸는지 달라서 폼에서 함께 넘긴다. */
@@ -41,6 +47,8 @@ export async function createItem(
     kind: formData.get('kind'),
     date: formData.get('date'),
     content: formData.get('content'),
+    // 펜을 고르지 않았으면 색 없이 저장하고 기본 글자색으로 보인다
+    color: formData.get('color') || null,
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message }
@@ -156,10 +164,13 @@ export async function saveDaily(
     return { error: '200자까지 입력할 수 있습니다.' }
   }
 
+  const parsedColor = HEX.safeParse(formData.get('color'))
+  const color = parsedColor.success ? parsedColor.data : null
+
   if (id) {
     const { error } = await supabase
       .from('items')
-      .update({ content })
+      .update({ content, color })
       .eq('id', id)
     if (error) return { error: '저장하지 못했습니다.' }
   } else {
@@ -168,9 +179,13 @@ export async function saveDaily(
     } = await supabase.auth.getUser()
     if (!user) return { error: '로그인이 필요합니다.' }
 
-    const { error } = await supabase
-      .from('items')
-      .insert({ kind: 'daily', date: date.data, content, user_id: user.id })
+    const { error } = await supabase.from('items').insert({
+      kind: 'daily',
+      date: date.data,
+      content,
+      color,
+      user_id: user.id,
+    })
     if (error) return { error: '저장하지 못했습니다.' }
   }
 

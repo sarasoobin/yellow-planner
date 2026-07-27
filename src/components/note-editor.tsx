@@ -52,7 +52,8 @@ export function NoteEditor({
           lastSaved.current = e.currentTarget.value
           e.currentTarget.form?.requestSubmit()
         }}
-        className="ruled w-full flex-1 resize-none bg-transparent p-0 text-sm text-ink-soft outline-none"
+        // text-sm은 줄 간격까지 같이 지정해서 괘선과 어긋난다. 크기만 준다.
+        className="ruled w-full flex-1 resize-none bg-transparent p-0 text-[14px] text-ink-soft outline-none"
       />
 
       <div className="flex h-4 items-center justify-end gap-2 text-[10px]">

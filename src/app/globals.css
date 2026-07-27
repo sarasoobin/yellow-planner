@@ -3,20 +3,32 @@
 /* ═══════════════════════════════════════════════════════════════
  *  🎨 색은 전부 여기서 고칩니다. 저장하면 앱 전체에 바로 반영됩니다.
  *
- *  노란색 후보 — 마음에 드는 값을 --color-frame 에 넣어보세요.
- *    #FDE68A  버터    ← 지금 이 색. 따뜻하고 부드러움
- *    #FFE066  병아리  더 쨍하고 귀여움
- *    #FFF0A5  레몬크림 더 연하고 은은함
- *    #F7DE8B  살구노랑 살짝 주황빛
- *    #F0E3A0  머스터드 처음 쓰던 색 (좀 칙칙함)
+ *  ── 노란색 후보 ──────────────────────────────────────────────
+ *  왼쪽이 표지색(--color-frame), 오른쪽이 짝이 되는 테두리색(--color-edge).
+ *  둘을 같이 바꿔야 자연스럽습니다.
  *
- *  --color-frame 을 바꾸면 --color-edge(테두리)도 같이 손보세요.
- *  테두리는 프레임보다 한 톤 진한 색이면 됩니다.
+ *    #FFF0A5 / #EBD97A   레몬크림     ← 지금 이 색. 연하고 은은함
+ *    #FFEFC2 / #E9D8A6   연한 크림    거의 흰 종이에 가까움
+ *    #FDE68A / #EDC85C   버터         따뜻하고 부드러움
+ *    #FCE788 / #E7CE5E   파스텔       채도 낮은 노랑
+ *    #FFE066 / #E8C43C   병아리       밝고 귀여움
+ *    #FFDF6B / #E5C244   개나리       선명함
+ *    #FFD84D / #DDB52E   진한 노랑    제일 쨍함
+ *    #F5D76E / #DCBB4E   골드         살짝 고급스러움
+ *    #F7DE8B / #E0C368   살구노랑     주황빛이 도는 노랑
+ *    #F2E3A8 / #DCCB80   미색         종이에 가까운 노랑
+ *    #EFD98A / #D8C070   모래         차분함
+ *    #F0E3A0 / #E0CE72   머스터드     처음 쓰던 색 (칙칙함)
+ *
+ *  ── 다른 색도 바꿀 수 있습니다 ────────────────────────────────
+ *    --color-paper  종이색. 노란기를 빼려면 #FFFFFF 에 가깝게
+ *    --color-rule   줄 색. 줄이 너무 진하면 연하게
+ *    --color-desk   노트 바깥 배경
  * ═══════════════════════════════════════════════════════════════ */
 @theme {
   /* 노트 */
-  --color-frame: #FFF0A5 ; /* 노트 표지 — 표지 페이지 전체, 프레임, 헤더 */
-  --color-edge: #edc85c; /* 프레임 테두리 — frame보다 한 톤 진하게 */
+  --color-frame: #fff0a5; /* 노트 표지 — 표지 페이지 전체, 프레임, 헤더 */
+  --color-edge: #ebd97a; /* 프레임 테두리 — frame보다 한 톤 진하게 */
   --color-paper: #fffdf4; /* 종이 — 달력·주간칸이 올라가는 면 */
   --color-desk: #f4f2ed; /* 책상 — 노트 바깥 배경 */
   --color-rule: #e4dac0; /* 괘선·칸 구분선 */
@@ -40,7 +52,7 @@
     sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* 공책 한 줄의 높이. 체크리스트·괘선 메모가 모두 이 값에 맞춰진다. */
+  /* 공책 한 줄의 높이. 체크리스트와 괘선 메모가 모두 이 값을 쓴다. */
   --spacing-line: 28px;
 }
 
@@ -57,16 +69,26 @@ body {
 }
 
 /*
- * 공책 괘선. 줄 간격과 line-height가 같아야 글자가 줄 위에 앉는다.
- * --spacing-line 을 바꾸면 체크리스트 줄 높이도 같이 따라온다.
+ * 공책 괘선.
+ *
+ * 줄바꿈했을 때 글자가 줄에 안 맞던 원인은 두 가지였다.
+ *   1) Tailwind의 text-sm 은 글자 크기와 줄 간격을 함께 지정한다.
+ *      그래서 여기서 정한 line-height 를 덮어써 간격이 어긋났다.
+ *      → 쓰는 쪽에서 text-[14px] 처럼 크기만 지정한다.
+ *   2) 줄을 칸 맨 아래에 그으면 글자 밑이 허전하게 뜬다.
+ *      → 글자가 앉는 자리 바로 밑(칸 아래에서 6px 위)에 긋는다.
+ *
+ * 줄 위치가 어색하면 아래 6px 만 조절하세요. 키우면 줄이 위로 올라갑니다.
  */
 @utility ruled {
   line-height: var(--spacing-line);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
-    transparent calc(var(--spacing-line) - 1px),
-    var(--color-rule) calc(var(--spacing-line) - 1px),
-    var(--color-rule) var(--spacing-line)
+    transparent calc(var(--spacing-line) - 6px),
+    var(--color-rule) calc(var(--spacing-line) - 6px),
+    var(--color-rule) calc(var(--spacing-line) - 5px),
+    transparent calc(var(--spacing-line) - 5px),
+    transparent var(--spacing-line)
   );
 }

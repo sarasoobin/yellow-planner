@@ -158,12 +158,12 @@ export default async function WeekPage({ params }: Params) {
         </div>
 
         {/* 주간 메모 — 제목 없이 줄만. 공책 아래칸이라는 게 보이면 충분하다 */}
-        <div className="border-t border-rule p-2 md:p-2.5">
+        <div className="shrink-0 border-t border-rule px-2 pt-1.5 pb-2 md:px-2.5">
           <NoteEditor
             initialContent={noteData?.content ?? ''}
             weekStart={monday}
             path={path}
-            rows={4}
+            rows={7}
           />
         </div>
       </div>
