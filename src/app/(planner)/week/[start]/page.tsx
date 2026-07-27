@@ -172,8 +172,11 @@ export default async function WeekPage({ params }: Params) {
           })}
         </div>
 
-        {/* 주간 메모 — 제목 없이 줄만. 공책 아래칸이라는 게 보이면 충분하다 */}
-        <div className="shrink-0 border-t border-rule px-2 pt-1.5 pb-2 md:px-2.5">
+        {/*
+          주간 메모 — 제목 없이 줄만. 공책 아래칸이라는 게 보이면 충분하다.
+          요일 칸과 나뉘는 자리라 다른 선들보다 굵게 그어 경계를 분명히 한다.
+        */}
+        <div className="shrink-0 border-t-2 border-rule px-2 pt-1.5 pb-2 md:px-2.5">
           <NoteEditor
             initialContent={noteData?.content ?? ''}
             weekStart={monday}
