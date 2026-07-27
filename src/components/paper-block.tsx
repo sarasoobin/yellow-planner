@@ -21,6 +21,22 @@ import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
 const BOX = '☐'
 const CHECKED = '☑'
 
+/**
+ * 공책 괘선.
+ *
+ * 칸마다 줄 간격이 달라서(달력 칸은 좁다) 클래스 대신 값으로 만든다.
+ * CSS 변수를 인라인 style 의 "키"로 넘기면 React가 처리하지 못한다.
+ */
+function ruledGradient(lineHeight: number): string {
+  const rule = lineHeight - 6
+  return [
+    'repeating-linear-gradient(to bottom,',
+    `transparent 0, transparent ${rule}px,`,
+    `var(--color-rule) ${rule}px, var(--color-rule) ${rule + 1}px,`,
+    `transparent ${rule + 1}px, transparent ${lineHeight}px)`,
+  ].join(' ')
+}
+
 type Draft = { color: string; style: ItemStyle }
 
 const DEFAULT_DRAFT: Draft = { color: PENS[0].hex, style: {} }
@@ -257,15 +273,7 @@ export function PaperBlock({
   const rowHeight = lineHeight ?? 28
 
   return (
-    <form
-      action={formAction}
-      className={`relative flex flex-col ${className}`}
-      style={
-        lineHeight
-          ? ({ '--spacing-line': `${lineHeight}px` } as React.CSSProperties)
-          : undefined
-      }
-    >
+    <form action={formAction} className={`relative flex flex-col ${className}`}>
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="path" value={path} />
@@ -303,10 +311,11 @@ export function PaperBlock({
             ? `${SIZES[draft.style.size]}px`
             : `${fontSize}px`,
           backgroundColor: draft.style.highlight ? HIGHLIGHT : undefined,
+          // 줄 간격이 칸마다 달라서 괘선을 여기서 직접 그린다.
+          // 글자가 앉는 자리 바로 밑(줄 아래에서 6px 위)에 긋는다.
+          backgroundImage: ruled ? ruledGradient(rowHeight) : undefined,
         }}
-        className={`w-full resize-none overflow-hidden bg-transparent p-0 outline-none placeholder:text-ink-faint/50 ${
-          ruled ? 'ruled' : ''
-        }`}
+        className="w-full resize-none overflow-hidden bg-transparent p-0 outline-none placeholder:text-ink-faint/50"
       />
 
       {open && (
