@@ -147,7 +147,8 @@ export default async function WeekPage({ params }: Params) {
                         aria-hidden
                         className="h-3 w-[3px] shrink-0"
                         style={{
-                          backgroundColor: events.get(date)?.color ?? '#C1453C',
+                          backgroundColor:
+                            events.get(date)?.color ?? 'var(--color-today)',
                         }}
                       />
                       <span className="truncate" title={headline}>

@@ -16,5 +16,10 @@ export function stickerSrc(key: string | null | undefined): string | null {
   return STICKERS.find((s) => s.key === key)?.src ?? null
 }
 
-/** 형광펜 색. 노란 종이 위에서도 보이도록 살짝 초록빛이 도는 노랑을 쓴다. */
+/**
+ * 형광펜 색. 노란 종이 위에서도 보이도록 살짝 초록빛이 도는 노랑을 쓴다.
+ *
+ * 펜 색과 같은 이유로 토큰이 아니라 값을 직접 적는다 (toolbar.tsx 의 PENS 주석).
+ * 글 안에 저장되는 색이라 var() 를 쓰면 sanitize.ts 가 걸러낸다.
+ */
 export const HIGHLIGHT = '#F3ED7A'

@@ -12,6 +12,17 @@ import { STICKERS } from '@/lib/stickers'
  * 펜 색·굵게·기울임·형광펜은 여기 없다. 적던 자리에서 `/` 를 치면 나온다.
  * 글을 적다 말고 위로 올라오지 않아도 되게 하기 위해서다.
  */
+/*
+ * 여기만 globals.css 의 토큰을 못 쓰고 색을 직접 적는다.
+ *
+ * 펜 색은 execCommand 가 글 안에 style="color:..." 로 박아 그대로 저장된다.
+ * 저장 직전 sanitize.ts 가 #hex 와 rgb() 만 통과시키므로 var(--color-ink) 를
+ * 넣으면 저장되는 순간 색이 통째로 날아간다.
+ *
+ * 검정은 --color-ink, 빨강은 --color-today 와 같은 값이다.
+ * globals.css 에서 그 둘을 바꾸면 여기도 같이 바꿔야 한다.
+ * 파랑은 짝이 되는 토큰이 없다 (펜에만 쓰는 색).
+ */
 export const PENS = [
   { key: 'black', label: '검정', hex: '#3A3226' },
   { key: 'red', label: '빨강', hex: '#C1453C' },

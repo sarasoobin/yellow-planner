@@ -19,8 +19,13 @@ export const MONTH_COLORS = [
   '#8FA3C4', // 12월
 ] as const
 
-/** 표지 탭 (제일 위) */
-export const COVER_COLOR = '#E0CE72'
+/**
+ * 표지 탭 (제일 위).
+ *
+ * 값을 적지 않고 프레임 테두리색을 그대로 가리킨다.
+ * globals.css 에서 노란색을 바꿨을 때 이 탭만 옛 색으로 남지 않게 하기 위해서다.
+ */
+export const COVER_COLOR = 'var(--color-edge)'
 /** Free Note 탭 (제일 아래) */
 export const NOTE_COLOR = '#C9C4BC'
 
