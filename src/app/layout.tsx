@@ -47,6 +47,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  /*
+   * 핸드폰 주소창을 표지색으로 물들인다. 노트를 펼친 것처럼 보이게 하는 것이
+   * 목적이라 화면 위쪽에 흰 띠가 남으면 안 된다.
+   *
+   * globals.css 의 --color-frame 과 같은 값이다. CSS 바깥이라 토큰을 못 쓴다.
+   * 표지색을 바꾸면 여기와 manifest.ts 도 같이 바꿔야 한다 (DESIGN.md §2).
+   */
+  themeColor: "#FFF099",
 };
 
 export const metadata: Metadata = {

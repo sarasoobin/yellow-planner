@@ -1,0 +1,24 @@
+<!--
+  브라우저 탭에 뜨는 아이콘 — 正 한 글자 (DESIGN.md §0).
+
+  획 좌표는 src/components/tally-mark.tsx 의 STROKES 와 같다.
+  로고의 正과 월간 페이지에서 완료를 세는 正이 다르게 생기면 안 되기 때문이다.
+
+  이 파일이 원본이다. apple-icon.png 와 public/icon-*.png 는
+  `npm run icons` 로 여기서 만들어낸다.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <rect width="24" height="24" rx="2" fill="#FFF099" />
+  <g
+    fill="none"
+    stroke="#8B6F3D"
+    stroke-width="2.4"
+    stroke-linecap="round"
+  >
+    <path d="M4 4 H20" />
+    <path d="M11 4 V20" />
+    <path d="M11 12 H19" />
+    <path d="M5 12 V20" />
+    <path d="M4 20 H20" />
+  </g>
+</svg>
