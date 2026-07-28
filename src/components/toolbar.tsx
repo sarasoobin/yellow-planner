@@ -71,7 +71,7 @@ export function Toolbar() {
       })}
 
       {armed && (
-        <span className="ml-1 hidden text-[11px] whitespace-nowrap text-ink-soft sm:inline">
+        <span className="ml-1 hidden text-[12px] whitespace-nowrap text-ink-soft sm:inline">
           붙일 자리를 누르세요
         </span>
       )}

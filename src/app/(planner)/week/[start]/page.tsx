@@ -112,14 +112,14 @@ export default async function WeekPage({ params }: Params) {
                 {/* 요일 · 날짜 · 그 날 한 줄 — 시안의 머리 띠 */}
                 <div className="flex items-center gap-1.5 border-b border-rule px-1.5 py-1.5">
                   <span
-                    className={`shrink-0 text-[11px] tracking-wide ${
+                    className={`shrink-0 text-[12px] tracking-wide ${
                       i === 6 ? 'text-today' : 'text-ink-faint'
                     }`}
                   >
                     {WEEKDAY_EN[i]}
                   </span>
                   <span
-                    className={`grid size-[19px] shrink-0 place-items-center rounded-full text-[13px] leading-none font-bold ${
+                    className={`grid size-[22px] shrink-0 place-items-center rounded-full text-[14px] leading-none font-bold ${
                       isToday ? 'bg-today text-paper' : 'text-ink'
                     }`}
                   >
@@ -133,8 +133,8 @@ export default async function WeekPage({ params }: Params) {
                     color={daily.color}
                     style={daily.style}
                     minRows={1}
-                    lineHeight={16}
-                    fontSize={11}
+                    lineHeight={20}
+                    fontSize={13}
                     ruled={false}
                     className="min-w-0 flex-1"
                   />
@@ -142,7 +142,7 @@ export default async function WeekPage({ params }: Params) {
 
                 <div className="flex flex-1 flex-col px-1.5 pt-1 pb-2">
                   {headline && (
-                    <div className="mb-1 flex items-center gap-1.5 text-[12px] leading-tight font-semibold text-ink">
+                    <div className="mb-1 flex items-center gap-1.5 text-[13px] leading-tight font-semibold text-ink">
                       <span
                         aria-hidden
                         className="h-3 w-[3px] shrink-0"

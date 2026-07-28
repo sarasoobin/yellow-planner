@@ -87,7 +87,11 @@ export default async function MonthPage({ params }: Params) {
         폰에서는 달력이 먼저 와야 한다 (DESIGN.md §6). 달을 열자마자
         메모부터 보이면 달력을 보려고 스크롤을 내려야 한다.
       */}
-      <aside className="order-2 flex shrink-0 flex-col border-t border-rule bg-frame/30 px-3 py-4 md:order-1 md:w-40 md:border-t-0 md:border-r">
+      {/*
+        폭은 글자가 몇 자쯤 들어가느냐로 정한다. 160px 에 16px 글자를 넣으니
+        두세 글자마다 줄이 바뀌어 읽을 수가 없었다. 화면이 넓으면 더 넓게 준다.
+      */}
+      <aside className="order-2 flex shrink-0 flex-col border-t border-rule bg-frame/30 px-3 py-4 md:order-1 md:w-56 md:border-t-0 md:border-r xl:w-72">
         <h1 className="font-hand mb-2 text-4xl leading-none text-ink">
           {monthLabel(ym)}
         </h1>
@@ -116,7 +120,7 @@ export default async function MonthPage({ params }: Params) {
           {WEEKDAY_LABELS.map((label, i) => (
             <div
               key={label}
-              className={`flex-1 pb-1 text-center text-[11px] font-semibold ${
+              className={`flex-1 pb-1 text-center text-[12px] font-semibold ${
                 i === 6 ? 'text-today' : 'text-ink-faint'
               }`}
             >
@@ -128,7 +132,7 @@ export default async function MonthPage({ params }: Params) {
         {/* 남는 세로 공간을 주(週) 수만큼 나눠 가져 칸이 최대한 커진다 */}
         <div className="flex flex-1 flex-col border-t border-l border-rule">
           {grid.map((week) => (
-            <div key={week[0]} className="flex min-h-[88px] flex-1">
+            <div key={week[0]} className="flex min-h-[108px] flex-1">
               {/* 주차 버튼 — 그 주의 주간 페이지로 (DESIGN.md §5-3) */}
               <Link
                 href={`/week/${week[0]}`}
@@ -154,7 +158,7 @@ export default async function MonthPage({ params }: Params) {
           ))}
         </div>
 
-        <p className="mt-2 text-[11px] text-ink-faint">
+        <p className="mt-2 text-[12px] text-ink-faint">
           날짜 옆부터 바로 적으면 됩니다. 길어지면 다음 줄로 이어지고, 왼쪽{' '}
           <span className="text-accent">›</span> 나 날짜를 누르면 그 주의 주간
           페이지로 갑니다.

@@ -14,7 +14,7 @@ import type { Block } from '@/lib/blocks'
  *
  * 날짜 숫자는 그 주의 주간 페이지로 가는 지름길이다.
  */
-const CELL_LINE = 18
+const CELL_LINE = 21
 
 export function CalendarCell({
   date,
@@ -42,7 +42,7 @@ export function CalendarCell({
       <Link
         href={`/week/${weekStart}`}
         aria-label={`${dayNumber(date)}일 주간 페이지로 이동`}
-        className={`absolute top-0.5 left-1 z-10 grid size-[18px] place-items-center rounded-full text-[12px] leading-none transition-colors ${
+        className={`absolute top-0.5 left-1 z-10 grid size-[21px] place-items-center rounded-full text-[13px] leading-none transition-colors ${
           isToday
             ? 'bg-today font-bold text-paper'
             : inMonth
@@ -74,10 +74,10 @@ export function CalendarCell({
         style={block.style}
         minRows={3}
         lineHeight={CELL_LINE}
-        fontSize={11}
+        fontSize={13}
         ruled={false}
         // 날짜 숫자를 피해 첫 줄만 들여쓴다. 길어지면 다음 줄은 왼쪽 끝부터.
-        firstLineIndent={22}
+        firstLineIndent={25}
         className="relative"
       />
     </div>

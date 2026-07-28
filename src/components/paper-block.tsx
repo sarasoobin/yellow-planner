@@ -76,7 +76,7 @@ const CHECK_OPTION: Option = {
   key: 'check',
   label: '체크박스',
   alias: 'checkbox todo box',
-  icon: <span className="text-[13px] leading-none">{BOX}</span>,
+  icon: <span className="text-[14px] leading-none">{BOX}</span>,
   command: { kind: 'insert', text: `${BOX} ` },
 }
 
@@ -86,14 +86,14 @@ const STYLE_OPTIONS: Option[] = [
     key: 'bold',
     label: '굵게',
     alias: 'bold',
-    icon: <span className="text-[11px] font-bold">B</span>,
+    icon: <span className="text-[12px] font-bold">B</span>,
     command: { kind: 'exec', name: 'bold' },
   },
   {
     key: 'italic',
     label: '기울임',
     alias: 'italic',
-    icon: <span className="font-serif text-[11px] italic">I</span>,
+    icon: <span className="font-serif text-[12px] italic">I</span>,
     command: { kind: 'exec', name: 'italic' },
   },
   {
@@ -128,7 +128,8 @@ const STYLE_OPTIONS: Option[] = [
     icon: (
       <span
         className="leading-none"
-        style={{ fontSize: `${Math.min(SIZES[size.key], 15)}px` }}
+        // 메뉴 아이콘은 실제 크기를 줄여서 보여준다. 그대로 쓰면 메뉴가 들쭉날쭉해진다.
+        style={{ fontSize: `${Math.min(Math.round(SIZES[size.key] * 0.72), 18)}px` }}
       >
         가
       </span>
@@ -180,7 +181,7 @@ export function PaperBlock({
   lineHeight,
   ruled = true,
   firstLineIndent,
-  fontSize = 14,
+  fontSize = 16,
   className = '',
 }: {
   kind: ItemKind
@@ -551,7 +552,7 @@ export function PaperBlock({
                 e.preventDefault()
                 run(option)
               }}
-              className="flex shrink-0 items-center gap-1 rounded-[3px] border border-ink/15 bg-paper px-2 py-1.5 text-[11px] whitespace-nowrap text-ink-soft active:bg-frame"
+              className="flex shrink-0 items-center gap-1 rounded-[3px] border border-ink/15 bg-paper px-2.5 py-2 text-[12px] whitespace-nowrap text-ink-soft active:bg-frame"
             >
               <span className="grid size-4 place-items-center">
                 {option.icon}
@@ -579,7 +580,7 @@ export function PaperBlock({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => run(option)}
                 onMouseEnter={() => setActive(i)}
-                className={`flex w-full cursor-pointer items-center gap-2 px-2 py-1 text-left text-[12px] ${
+                className={`flex w-full cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left text-[13px] ${
                   i === active ? 'bg-frame/60 text-ink' : 'text-ink-soft'
                 }`}
               >
@@ -594,7 +595,7 @@ export function PaperBlock({
       )}
 
       {state.error && (
-        <p role="alert" className="pt-1 text-[10px] text-danger">
+        <p role="alert" className="pt-1 text-[11px] text-danger">
           {state.error}
         </p>
       )}

@@ -30,7 +30,7 @@ export function MonthlyProgress({
           월별 달성
         </h2>
         {yearTotal > 0 && (
-          <span className="text-[11px] text-ink-faint">
+          <span className="text-[12px] text-ink-faint">
             올해 {yearTotal}개 중 {yearDone}개
           </span>
         )}
@@ -70,7 +70,7 @@ export function MonthlyProgress({
                   }}
                 />
               </Link>
-              <span className="text-[9px] leading-none text-ink-faint">
+              <span className="text-[10px] leading-none text-ink-faint">
                 {i + 1}
               </span>
             </li>
