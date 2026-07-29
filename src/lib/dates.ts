@@ -120,6 +120,21 @@ export function weekRangeLabel(startISO: string): string {
     : `${format(start, 'M월 d일')} – ${format(end, 'M월 d일')}`
 }
 
+/**
+ * 이 주가 "어느 달의 주"인가.
+ *
+ * 월요일이 속한 달로 정하면 안 된다. 2026년 7월은 1일이 수요일이라 첫 주의
+ * 월요일이 6월 29일이다. 그 규칙을 쓰면 7월 1일에 적어둔 것을 보러 갔다가
+ * 6월 달력으로 돌아오게 되고, 적은 게 사라진 것처럼 보인다.
+ *
+ * 목요일이 속한 달로 정한다. 이레 중 나흘 이상이 그 달에 들어 있다는 뜻이라
+ * 어느 쪽으로 치우쳐도 사람이 생각하는 "그 주의 달"과 어긋나지 않는다.
+ */
+export function weekOwnerMonth(startISO: string): string {
+  const days = weekDays(startISO)
+  return (days[3] ?? startISO).slice(0, 7)
+}
+
 /** 오늘이 속한 달의 'YYYY-MM' — 인덱스 탭이 어느 해를 가리킬지 정하는 데 쓴다 */
 export function currentYearMonth(): string {
   return format(new Date(), 'yyyy-MM')

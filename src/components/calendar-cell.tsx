@@ -19,6 +19,7 @@ const CELL_LINE = 21
 export function CalendarCell({
   date,
   weekStart,
+  ym,
   block,
   taskCount,
   isToday,
@@ -27,6 +28,8 @@ export function CalendarCell({
 }: {
   date: string
   weekStart: string
+  /** 지금 보고 있는 달. 주간에 갔다가 이 달로 돌아오게 하는 데 쓴다 */
+  ym: string
   block: Block
   taskCount: number
   isToday: boolean
@@ -40,7 +43,7 @@ export function CalendarCell({
       }`}
     >
       <Link
-        href={`/week/${weekStart}`}
+        href={`/week/${weekStart}?from=${ym}`}
         aria-label={`${dayNumber(date)}일 주간 페이지로 이동`}
         className={`absolute top-0.5 left-1 z-10 grid size-[21px] place-items-center rounded-full text-[13px] leading-none transition-colors ${
           isToday

@@ -4,12 +4,14 @@ import { createClient } from '@/lib/supabase/server'
 import { NoteEditor } from '@/components/note-editor'
 import { PaperBlock } from '@/components/paper-block'
 import { StickerLayer } from '@/components/sticker-layer'
-import { EMPTY_BLOCK, blocksByDate, firstLine } from '@/lib/blocks'
+import { EMPTY_BLOCK, blocksByDate, countLines, firstLine } from '@/lib/blocks'
 import {
   dayNumber,
   fromISODate,
+  parseYearMonth,
   todayISO,
   weekDays,
+  weekOwnerMonth,
   weekRangeLabel,
   weekStartOf,
 } from '@/lib/dates'
@@ -18,24 +20,40 @@ import type { Item } from '@/lib/types'
 /** 디자인 시안(JE_바름이5.pdf)을 따라 요일은 영문 소문자로 적는다 */
 const WEEKDAY_EN = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
-type Params = { params: Promise<{ start: string }> }
+type Params = {
+  params: Promise<{ start: string }>
+  // Next.js 16에서 searchParams는 Promise다. 반드시 await 해야 한다.
+  searchParams: Promise<{ from?: string }>
+}
 
 export async function generateMetadata({ params }: Params) {
   const { start } = await params
   return { title: `${weekRangeLabel(start)} · 正 PLANNER` }
 }
 
-export default async function WeekPage({ params }: Params) {
+export default async function WeekPage({ params, searchParams }: Params) {
   const { start } = await params
+  const { from } = await searchParams
   if (!fromISODate(start)) notFound()
+
+  /*
+   * 어느 달력에서 왔는지. 달력에서 누르고 들어오면 그 달이 함께 넘어온다.
+   * 주소창에 직접 쳐서 들어온 경우처럼 없을 때는 이 주가 걸쳐 있는 달로 정한다.
+   *
+   * 이게 없으면 "달력으로" 가 그 주 월요일이 속한 달로 가버린다. 7월 1일에
+   * 적고 주간에 갔다가 돌아오면 6월 달력이 열려서 적은 게 사라진 것처럼 보였다.
+   */
+  const cameFrom = from && parseYearMonth(from) ? from : null
 
   // 주 시작은 항상 월요일이다. 주중 날짜로 들어오면 그 주의 월요일로 보낸다.
   const monday = weekStartOf(start)
-  if (monday !== start) redirect(`/week/${monday}`)
+  const query = cameFrom ? `?from=${cameFrom}` : ''
+  if (monday !== start) redirect(`/week/${monday}${query}`)
 
   const days = weekDays(monday)
   const today = todayISO()
-  const ym = monday.slice(0, 7)
+  const ym = cameFrom ?? weekOwnerMonth(monday)
+  // 저장 뒤 화면을 새로 그릴 경로. 쿼리를 붙이면 revalidatePath 가 못 알아본다
   const path = `/week/${monday}`
 
   const supabase = await createClient()
@@ -69,6 +87,15 @@ export default async function WeekPage({ params }: Params) {
   const events = blocksByDate(items.filter((i) => i.kind === 'event'))
   const tasks = blocksByDate(items.filter((i) => i.kind === 'task'))
   const dailies = blocksByDate(items.filter((i) => i.kind === 'daily'))
+
+  /*
+   * 안내 문구를 일곱 칸에 전부 깔면 화면이 회색 글씨로 뒤덮인다.
+   * 아직 비어 있는 첫 칸에만 한 번 보여준다. 그 칸을 채우면 안내는
+   * 다음 빈 칸으로 옮겨 가고, 한 주를 다 채우면 사라진다.
+   */
+  const hintDate = days.find(
+    (date) => countLines(tasks.get(date)?.content ?? '') === 0
+  )
 
   return (
     <StickerLayer
@@ -165,6 +192,9 @@ export default async function WeekPage({ params }: Params) {
                     color={task.color}
                     style={task.style}
                     minRows={10}
+                    placeholder={
+                      date === hintDate ? '할 일을 적어보세요' : undefined
+                    }
                     className="flex-1"
                   />
                 </div>
@@ -183,6 +213,7 @@ export default async function WeekPage({ params }: Params) {
             weekStart={monday}
             path={path}
             rows={8}
+            placeholder="이번 주 메모"
           />
         </div>
       </div>

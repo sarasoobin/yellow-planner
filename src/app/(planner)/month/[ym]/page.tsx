@@ -105,6 +105,7 @@ export default async function MonthPage({ params }: Params) {
           color={memo.color}
           style={memo.style}
           minRows={12}
+          placeholder="이 달에 잊지 말 것"
         />
 
         {monthDone > 0 && (
@@ -134,8 +135,10 @@ export default async function MonthPage({ params }: Params) {
           {grid.map((week) => (
             <div key={week[0]} className="flex min-h-[108px] flex-1">
               {/* 주차 버튼 — 그 주의 주간 페이지로 (DESIGN.md §5-3) */}
+              {/* 어느 달에서 눌렀는지 함께 넘긴다. 주간에서 "달력으로" 를
+                  누르면 이 달로 돌아온다 (lib/dates.ts weekOwnerMonth 주석) */}
               <Link
-                href={`/week/${week[0]}`}
+                href={`/week/${week[0]}?from=${ym}`}
                 aria-label={`${dayNumber(week[0])}일 주간 페이지로 이동`}
                 className="flex w-7 shrink-0 items-center justify-center border-r border-b border-rule text-ink-faint transition-colors hover:bg-frame/50 hover:text-accent"
               >
@@ -147,6 +150,7 @@ export default async function MonthPage({ params }: Params) {
                   key={date}
                   date={date}
                   weekStart={week[0]}
+                  ym={ym}
                   block={events.get(date) ?? EMPTY_BLOCK}
                   taskCount={countLines(tasks.get(date)?.content ?? '')}
                   isToday={date === today}
