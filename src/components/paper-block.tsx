@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState, useSyncExternalStore } from 'react'
 import { saveBlock } from '@/lib/actions/items'
-import { PENS } from '@/components/toolbar'
+import { PENS, useArmedSticker } from '@/components/toolbar'
 import { HIGHLIGHT } from '@/lib/stickers'
 import { isBlank, toDisplayHtml } from '@/lib/rich-text'
 import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
@@ -55,6 +55,8 @@ type Command =
   | { kind: 'insert'; text: string }
   | { kind: 'exec'; name: string; value?: string }
   | { kind: 'size'; px: number }
+  /** 형광펜만 따로 둔다. 켜고 끄는 것을 직접 챙겨야 해서 (toggleHighlight) */
+  | { kind: 'highlight' }
 
 type Option = {
   key: string
@@ -106,7 +108,7 @@ const STYLE_OPTIONS: Option[] = [
         style={{ backgroundColor: HIGHLIGHT }}
       />
     ),
-    command: { kind: 'exec', name: 'hiliteColor', value: HIGHLIGHT },
+    command: { kind: 'highlight' },
   },
   ...PENS.map((pen) => ({
     key: `pen-${pen.key}`,
@@ -140,12 +142,73 @@ const STYLE_OPTIONS: Option[] = [
 
 const OPTIONS: Option[] = [CHECK_OPTION, ...STYLE_OPTIONS]
 
+/** '#F3ED7A' -> 'rgb(243, 237, 122)'. 브라우저가 돌려주는 형식과 맞추려고 */
+function toRgb(hex: string): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`
+}
+
+const HIGHLIGHT_RGB = toRgb(HIGHLIGHT)
+
+/**
+ * 지금 커서 자리가 이미 형광펜으로 칠해져 있는가.
+ *
+ * hiliteColor 는 굵게·기울임과 달리 껐다 켰다 하는 명령이 아니라 색을 넣는
+ * 명령이다. 같은 색을 또 넣어봐야 그대로다. 그래서 칠해져 있는지 직접 보고,
+ * 칠해져 있으면 투명으로 되돌려 지운다.
+ */
+function isHighlighted(): boolean {
+  const selection = window.getSelection()
+  const node = selection?.anchorNode
+  if (!node) return false
+
+  const element = node.nodeType === 1 ? (node as Element) : node.parentElement
+  if (!element) return false
+
+  // 칠하지 않은 글자는 투명(rgba(0, 0, 0, 0))이 나온다
+  return getComputedStyle(element).backgroundColor === HIGHLIGHT_RGB
+}
+
+/** 형광펜을 칠하거나 지운다 */
+function toggleHighlight() {
+  document.execCommand('styleWithCSS', false, 'true')
+  document.execCommand(
+    'hiliteColor',
+    false,
+    isHighlighted() ? 'transparent' : HIGHLIGHT,
+  )
+}
+
+/**
+ * 커서만 있을 때(고른 글자가 없을 때) 크기를 정하는 데 쓰는 빈 자리표.
+ *
+ * 빈 span 은 브라우저가 곧바로 지워버려서 크기를 붙들어둘 수가 없다.
+ * 눈에 안 보이는 글자 하나를 넣어 span 을 살려두고, 그 안에 커서를 놓는다.
+ * 이후 치는 글자가 그 안에 들어가 그 크기로 적힌다.
+ * 저장할 때 이 글자는 걷어낸다 (lib/actions/items.ts).
+ */
+const ZERO_WIDTH = '​'
+
 /** 고른 글자를 span 으로 감싸 크기를 준다. execCommand 의 fontSize 는 1~7 뿐이라 직접 한다. */
 function wrapFontSize(px: number) {
   const selection = window.getSelection()
   if (!selection || selection.rangeCount === 0) return
   const range = selection.getRangeAt(0)
-  if (range.collapsed) return
+
+  // 고른 글자가 없으면 자리표를 놓고 그 안에서 이어 쓰게 한다
+  if (range.collapsed) {
+    const holder = document.createElement('span')
+    holder.style.fontSize = `${px}px`
+    holder.textContent = ZERO_WIDTH
+    range.insertNode(holder)
+
+    const after = document.createRange()
+    after.setStart(holder.firstChild!, 1)
+    after.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(after)
+    return
+  }
 
   const span = document.createElement('span')
   span.style.fontSize = `${px}px`
@@ -205,6 +268,7 @@ export function PaperBlock({
 }) {
   const [state, formAction] = useActionState(saveBlock, { error: null })
   const narrow = useIsNarrow()
+  const { marker } = useArmedSticker()
 
   const editorRef = useRef<HTMLDivElement>(null)
   const hiddenRef = useRef<HTMLInputElement>(null)
@@ -309,6 +373,51 @@ export function PaperBlock({
     setMenuAt(positionBelow(rect, 176))
   }
 
+  /**
+   * 줄 맨 앞에 적은 `# ` `## ` `### ` 를 글자 크기로 바꾼다.
+   *
+   * 이 앱에는 '제목' 이라는 것이 따로 없고 글자 크기 네 단계만 있다.
+   * 그래서 마크다운의 제목 단계를 크기로 옮긴다.
+   *   `# `   아주 크게        `## `  크게        `### ` 보통 + 굵게
+   *
+   * 줄 맨 앞에서만 본다. 문장 중간의 `#` 은 그냥 글자다 ("#3 과제").
+   * 그 판단은 "커서 앞의 글자가 `#` 들과 띄어쓰기뿐인가" 하나로 충분하다.
+   * 앞에 다른 글자가 있으면 같은 글자 노드에 들어 있어 걸러진다.
+   *
+   * 바뀐 게 있으면 true.
+   */
+  function applyMarkdown(): boolean {
+    const root = editorRef.current
+    const selection = window.getSelection()
+    if (!root || !selection || selection.rangeCount === 0) return false
+
+    const node = selection.anchorNode
+    if (!node || node.nodeType !== Node.TEXT_NODE || !root.contains(node)) {
+      return false
+    }
+
+    const text = node as Text
+    const offset = selection.anchorOffset
+    const marks = /^(#{1,3}) $/.exec(text.data.slice(0, offset))
+    if (!marks) return false
+
+    // 적어둔 `#` 을 지운다. 직접 지우면 빈 글자 노드가 남아 뒤이은 명령이
+    // 먹지 않는다 (run() 의 `/명령어` 지우기와 같은 이유). 브라우저에 맡긴다.
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, offset)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    document.execCommand('delete')
+
+    document.execCommand('styleWithCSS', false, 'true')
+    const level = marks[1].length
+    wrapFontSize(level === 1 ? SIZES.xl : level === 2 ? SIZES.lg : SIZES.md)
+    if (level === 3) document.execCommand('bold')
+
+    return true
+  }
+
   /** 글자를 골랐는지 살펴 막대를 띄우거나 감춘다 */
   function syncPicked() {
     const root = editorRef.current
@@ -323,12 +432,47 @@ export function PaperBlock({
     setPickedAt(positionBelow(range.getBoundingClientRect(), 300))
   }
 
+  /**
+   * 손을 뗐을 때. 형광펜을 집어들었으면 방금 긁은 만큼 칠한다.
+   *
+   * 형광펜은 내려놓을 때까지 켜져 있다. 여러 군데를 이어서 칠하는 물건이라
+   * 한 번 칠할 때마다 다시 집어들게 하면 쓸 수가 없다.
+   */
+  function handleMouseUp() {
+    const root = editorRef.current
+    const selection = window.getSelection()
+    const range =
+      selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+
+    const scribbled =
+      marker &&
+      root &&
+      range &&
+      !range.collapsed &&
+      root.contains(range.commonAncestorContainer)
+
+    if (!scribbled) return syncPicked()
+
+    toggleHighlight()
+    // 칠한 자리가 그대로 남아 있으면 다음에 그은 데가 어디인지 헷갈린다
+    selection!.removeAllRanges()
+    setPickedAt(null)
+    save()
+  }
+
   /** 안내 문구를 띄울지 말지. 내용이 바뀔 만한 곳마다 다시 본다. */
   function syncEmpty() {
     setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
   }
 
   function handleInput() {
+    // 줄 앞의 `#` 을 크기로 바꿨다면 `/` 메뉴는 볼 것도 없다
+    if (applyMarkdown()) {
+      syncEmpty()
+      closeMenu()
+      return
+    }
+
     syncEmpty()
     setPickedAt(null)
     /*
@@ -372,6 +516,8 @@ export function PaperBlock({
       document.execCommand('insertText', false, command.text)
     } else if (command.kind === 'exec') {
       document.execCommand(command.name, false, command.value)
+    } else if (command.kind === 'highlight') {
+      toggleHighlight()
     } else {
       wrapFontSize(command.px)
     }
@@ -429,7 +575,8 @@ export function PaperBlock({
   const rowHeight = lineHeight ?? 28
   const showMobileBar = narrow && focused
   // 폰에서는 칸을 누르면 이미 막대가 떠 있다. 두 개가 겹치면 어지럽다.
-  const showPickedBar = pickedAt !== null && !narrow
+  // 형광펜을 든 동안에도 띄우지 않는다. 긁는 족족 칠해지므로 고를 일이 없다.
+  const showPickedBar = pickedAt !== null && !narrow && !marker
 
   return (
     <form action={formAction} className={`relative flex flex-col ${className}`}>
@@ -460,7 +607,7 @@ export function PaperBlock({
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onKeyUp={syncPicked}
-          onMouseUp={syncPicked}
+          onMouseUp={handleMouseUp}
           onClick={handleClick}
           onFocus={() => setFocused(true)}
           onBlur={() => {

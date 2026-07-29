@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useMemo, useState } from 'react'
-import { STICKERS } from '@/lib/stickers'
+import { HIGHLIGHT, STICKERS } from '@/lib/stickers'
 
 /**
  * 스티커 통.
@@ -33,11 +33,16 @@ type ArmedState = {
   /** 지금 집어든 스티커 이름. 없으면 null */
   armed: string | null
   setArmed: (key: string | null) => void
+  /** 형광펜을 집어들었는가. 켜두면 긁는 곳마다 계속 칠해진다 */
+  marker: boolean
+  setMarker: (on: boolean) => void
 }
 
 const ArmedContext = createContext<ArmedState>({
   armed: null,
   setArmed: () => {},
+  marker: false,
+  setMarker: () => {},
 })
 
 export function useArmedSticker(): ArmedState {
@@ -45,17 +50,66 @@ export function useArmedSticker(): ArmedState {
 }
 
 export function ToolProvider({ children }: { children: React.ReactNode }) {
-  const [armed, setArmed] = useState<string | null>(null)
-  const value = useMemo(() => ({ armed, setArmed }), [armed])
+  const [armed, setArmedState] = useState<string | null>(null)
+  const [marker, setMarkerState] = useState(false)
+
+  /*
+   * 스티커와 형광펜은 한 번에 하나만 든다.
+   * 둘 다 든 채로 페이지를 누르면 무엇을 하려던 건지 알 수 없다.
+   */
+  const value = useMemo(
+    () => ({
+      armed,
+      marker,
+      setArmed: (key: string | null) => {
+        setArmedState(key)
+        if (key) setMarkerState(false)
+      },
+      setMarker: (on: boolean) => {
+        setMarkerState(on)
+        if (on) setArmedState(null)
+      },
+    }),
+    [armed, marker],
+  )
 
   return <ArmedContext.Provider value={value}>{children}</ArmedContext.Provider>
 }
 
 export function Toolbar() {
-  const { armed, setArmed } = useArmedSticker()
+  const { armed, setArmed, marker, setMarker } = useArmedSticker()
 
   return (
     <div className="flex min-w-0 items-center gap-1.5">
+      {/*
+        형광펜. 집어들면 끌어서 그은 만큼 칠해진다.
+        이미 칠해진 곳을 그으면 지워진다 — 진짜 형광펜과 다른 점이지만,
+        지우는 방법이 따로 없으면 잘못 칠했을 때 되돌릴 길이 없다.
+      */}
+      <button
+        type="button"
+        aria-pressed={marker}
+        aria-label="형광펜"
+        title={
+          marker ? '내려놓기' : '형광펜 — 집어든 뒤 칠할 글자를 긁으세요'
+        }
+        onClick={() => setMarker(!marker)}
+        className={`grid size-7 shrink-0 cursor-pointer place-items-center rounded-[3px] border transition-all ${
+          marker
+            ? 'scale-110 border-accent bg-paper shadow-[0_1px_3px_rgba(58,50,38,.25)]'
+            : 'border-transparent opacity-55 hover:opacity-100'
+        }`}
+      >
+        <span
+          aria-hidden
+          className="block h-[9px] w-[15px] rounded-[1px]"
+          style={{ backgroundColor: HIGHLIGHT }}
+        />
+      </button>
+
+      {/* 필통과 스티커 통 사이 칸막이 */}
+      <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-ink/15" />
+
       {STICKERS.map((sticker) => {
         const on = armed === sticker.key
         return (
@@ -80,6 +134,12 @@ export function Toolbar() {
           </button>
         )
       })}
+
+      {marker && (
+        <span className="ml-1 hidden text-[12px] whitespace-nowrap text-ink-soft sm:inline">
+          칠할 글자를 긁으세요
+        </span>
+      )}
 
       {armed && (
         <span className="ml-1 hidden text-[12px] whitespace-nowrap text-ink-soft sm:inline">

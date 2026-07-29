@@ -42,6 +42,9 @@ export function toPlainText(html: string): string {
     .replace(/<\/(div|p)>/gi, '\n')
     .replace(/<[^>]*>/g, '')
     .replace(/&nbsp;/g, ' ')
+    // 크기 자리표로 넣어둔 눈에 안 보이는 글자 (paper-block.tsx ZERO_WIDTH).
+    // 이걸 안 걷어내면 아무것도 안 적은 칸이 "적은 것 있음"으로 보인다.
+    .replace(/​/g, '')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')

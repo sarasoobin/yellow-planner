@@ -87,7 +87,12 @@ export async function saveBlock(
     return { error: '저장할 자리를 찾지 못했습니다.' }
   }
 
-  const raw = String(formData.get('content') ?? '')
+  /*
+   * 눈에 안 보이는 자리표 글자(U+200B)를 걷어낸다.
+   * 고른 글자 없이 크기만 정할 때 그 크기를 붙들어두려고 넣어둔 것이라
+   * (components/paper-block.tsx ZERO_WIDTH) 저장할 내용은 아니다.
+   */
+  const raw = String(formData.get('content') ?? '').replace(/​/g, '')
   if (raw.length > MAX_LENGTH) {
     return { error: `${MAX_LENGTH}자까지 적을 수 있습니다.` }
   }
