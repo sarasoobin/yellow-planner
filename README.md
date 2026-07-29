@@ -75,20 +75,20 @@
 ## 아키텍처
 
 ```mermaid
-flowchart LR
-  B["브라우저<br/>PaperBlock (contenteditable)"]
-  P["proxy.ts<br/>세션 갱신 · 보호 라우트"]
-  S["Server Action<br/>saveBlock / saveNote"]
-  Z["Zod + sanitize-html"]
-  D[("Supabase<br/>PostgreSQL")]
-  R{{"RLS<br/>본인 행만"}}
+flowchart TD
+  B["브라우저 — PaperBlock (contenteditable)"]
+  P["proxy.ts — 세션 갱신 · 보호 라우트"]
+  S["Server Action — saveBlock / saveNote"]
+  Z["Zod 검증 → sanitize-html 로 거르기"]
+  D[("Supabase PostgreSQL")]
+  R{{"RLS — 본인 행만 오간다"}}
 
   B -->|"칸에서 손 떼면 저장"| P
   P --> S
   S --> Z
   Z --> D
-  D --- R
-  D -->|"revalidatePath"| B
+  D --> R
+  R -->|"revalidatePath 로 화면 다시 그리기"| B
 ```
 
 API 라우트가 없습니다. 폼이 Server Action을 직접 부르고, 그 안에서 검증 →
