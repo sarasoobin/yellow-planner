@@ -46,6 +46,7 @@ export default async function FreeNotePage() {
         weekStart={null}
         path="/note"
         rows={18}
+        placeholder="어디에도 안 들어가는 것을 적는 곳입니다"
       />
     </StickerLayer>
   )

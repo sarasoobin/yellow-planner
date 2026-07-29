@@ -17,12 +17,15 @@ export function NoteEditor({
   weekStart,
   path,
   rows = 4,
+  placeholder,
 }: {
   initialContent: string
   /** 주간 메모면 그 주의 월요일, Free Note면 null */
   weekStart: string | null
   path: string
   rows?: number
+  /** 비어 있을 때 옅게 깔아둘 안내. 처음 온 사람에게 여기가 적는 곳임을 알린다 */
+  placeholder?: string
 }) {
   const [state, formAction, pending] = useActionState(saveNote, EMPTY)
   const lastSaved = useRef(initialContent)
@@ -45,7 +48,8 @@ export function NoteEditor({
         defaultValue={initialContent}
         rows={rows}
         maxLength={5000}
-        aria-label="메모"
+        placeholder={placeholder}
+        aria-label={placeholder || '메모'}
         onChange={() => setTypedAt(state)}
         onBlur={(e) => {
           if (e.currentTarget.value === lastSaved.current) return
@@ -53,7 +57,8 @@ export function NoteEditor({
           e.currentTarget.form?.requestSubmit()
         }}
         // text-sm은 줄 간격까지 같이 지정해서 괘선과 어긋난다. 크기만 준다.
-        className="ruled w-full flex-1 resize-none bg-transparent p-0 text-[16px] text-ink-soft outline-none"
+        // 안내 글씨는 PaperBlock 의 것과 같은 농도로 맞춘다. 진하면 적어둔 글로 보인다
+        className="ruled w-full flex-1 resize-none bg-transparent p-0 text-[16px] text-ink-soft outline-none placeholder:text-ink-faint/50"
       />
 
       <div className="flex h-4 items-center justify-end gap-2 text-[11px]">
