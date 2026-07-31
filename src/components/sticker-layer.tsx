@@ -197,9 +197,23 @@ function PlacedSticker({
   layerRect: () => DOMRect | null
   onCommit: (id: string, x: number, y: number, scale: number) => void
 }) {
-  const savedX = sticker.style?.x ?? 50
-  const savedY = sticker.style?.y ?? 50
-  const savedScale = sticker.style?.scale ?? 1
+  /*
+   * 방금 놓은 자리.
+   *
+   * 손을 떼면 서버에 저장하는데, 그 답이 올 때까지 화면이 이 값을 붙들고
+   * 있어야 한다. 안 그러면 놓는 순간 원래 자리로 되돌아갔다가 답이 온 뒤
+   * 새 자리로 튄다. 내 컴퓨터에서는 왕복이 50ms 라 안 보였지만 배포된
+   * 서버에서는 눈에 띄게 튀었다.
+   */
+  const [placed, setPlaced] = useState<{
+    x: number
+    y: number
+    scale: number
+  } | null>(null)
+
+  const savedX = placed?.x ?? sticker.style?.x ?? 50
+  const savedY = placed?.y ?? sticker.style?.y ?? 50
+  const savedScale = placed?.scale ?? sticker.style?.scale ?? 1
 
   // 끄는 동안 얼마나 밀렸는지(px). 손을 떼면 % 로 바꿔 저장한다
   const [shift, setShift] = useState<{ dx: number; dy: number } | null>(null)
@@ -240,14 +254,17 @@ function PlacedSticker({
   function endMove() {
     if (!shift) return
     const at = clamp(shift.dx, shift.dy)
-    onCommit(sticker.id, at.x, at.y, scale)
+    // 화면이 먼저 그 자리를 붙들고, 저장은 뒤따른다
+    setPlaced({ x: at.x, y: at.y, scale })
     setShift(null)
+    onCommit(sticker.id, at.x, at.y, scale)
   }
 
   function endResize() {
     if (sizing === null) return
-    onCommit(sticker.id, savedX, savedY, sizing)
+    setPlaced({ x: savedX, y: savedY, scale: sizing })
     setSizing(null)
+    onCommit(sticker.id, savedX, savedY, sizing)
   }
 
   return (
