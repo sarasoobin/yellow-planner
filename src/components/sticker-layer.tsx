@@ -208,20 +208,39 @@ function PlacedSticker({
 
   const from = useRef({ x: 0, y: 0 })
   const boxRef = useRef<HTMLDivElement>(null)
+  // 잡는 순간의 종이 크기. 끄는 내내 안 변하므로 한 번만 재둔다
+  const paper = useRef<DOMRect | null>(null)
 
   const scale = sizing ?? savedScale
   const size = STICKER_SIZE * scale
   const moving = shift !== null
   const resizing = sizing !== null
 
+  /**
+   * 손끝이 움직인 만큼을 종이 안으로 가둔다.
+   *
+   * 끄는 동안에는 아무 데나 따라가게 두고 저장할 때만 가두면, 종이 밖까지
+   * 끌었다가 손을 뗀 순간 스티커가 안쪽으로 튀어 들어온다. 게다가 종이 밖은
+   * 잘려서 보이지도 않는다. 보이는 그대로가 저장되도록 끄는 동안 가둔다.
+   */
+  function clamp(dx: number, dy: number) {
+    const rect = paper.current
+    if (!rect) return { dx, dy, x: savedX, y: savedY }
+
+    const x = Math.min(Math.max(savedX + (dx / rect.width) * 100, 0), 100)
+    const y = Math.min(Math.max(savedY + (dy / rect.height) * 100, 0), 100)
+    return {
+      dx: ((x - savedX) / 100) * rect.width,
+      dy: ((y - savedY) / 100) * rect.height,
+      x,
+      y,
+    }
+  }
+
   function endMove() {
     if (!shift) return
-    const rect = layerRect()
-    if (rect) {
-      const x = Math.min(Math.max(savedX + (shift.dx / rect.width) * 100, 0), 100)
-      const y = Math.min(Math.max(savedY + (shift.dy / rect.height) * 100, 0), 100)
-      onCommit(sticker.id, x, y, scale)
-    }
+    const at = clamp(shift.dx, shift.dy)
+    onCommit(sticker.id, at.x, at.y, scale)
     setShift(null)
   }
 
@@ -249,14 +268,13 @@ function PlacedSticker({
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)
           from.current = { x: e.clientX, y: e.clientY }
+          paper.current = layerRect()
           setShift({ dx: 0, dy: 0 })
         }}
         onPointerMove={(e) => {
           if (!moving) return
-          setShift({
-            dx: e.clientX - from.current.x,
-            dy: e.clientY - from.current.y,
-          })
+          const at = clamp(e.clientX - from.current.x, e.clientY - from.current.y)
+          setShift({ dx: at.dx, dy: at.dy })
         }}
         onPointerUp={endMove}
         onPointerCancel={endMove}
@@ -279,7 +297,15 @@ function PlacedSticker({
                 }
               : { width: `${size}px`, height: `${size}px` }
           }
-          className={`block select-none ${moving ? 'opacity-80' : ''}`}
+          /*
+           * 집어들면 살짝 커지고 그림자가 진다. 사진을 종이에서 떼어
+           * 든 것처럼 보이게 하는 것이다. 흐려지게 하면 사진 같지 않다.
+           */
+          className={`block origin-center select-none ${
+            moving
+              ? 'scale-[1.06] drop-shadow-[0_3px_5px_rgba(58,50,38,.35)]'
+              : ''
+          }`}
         />
       </button>
 
