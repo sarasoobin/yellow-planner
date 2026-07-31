@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import { saveBlock } from '@/lib/actions/items'
 import { PENS, useArmedSticker } from '@/components/toolbar'
 import { useIsNarrow } from '@/components/use-is-narrow'
-import { HIGHLIGHT, HIGHLIGHT_COLORS } from '@/lib/stickers'
+import { HIGHLIGHTS, HIGHLIGHT_COLORS, UNDERLINE_COLOR } from '@/lib/stickers'
 import { isBlank, toDisplayHtml } from '@/lib/rich-text'
 import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
 
@@ -37,15 +37,22 @@ const CHECKED = '☑'
  */
 type CheckMark = { x: number; y: number; size: number }
 
-/** 글자 크기 대비 표시 크기. 1보다 크면 네모를 넘어간다 */
-const MARK_SCALE = 1.4
-
 /**
- * 표시를 글자 한가운데에서 얼마나 밀지 (표시 크기 대비).
- * 체크의 긴 획이 오른쪽 위로 뻗어서, 가운데에 맞추면 끝이 뒷글자를 건드린다.
+ * 글자 위나 아래에 긋는 줄.
+ *
+ * 취소선 — 체크한 줄의 글자를 가로지른다. "다 한 일" 이라는 뜻이다.
+ * 밑줄  — 밑줄 자로 긁은 글자 아래에 그어진다.
+ *
+ * 둘 다 체크 표시와 같은 방식이다. 글에는 사실만 저장하고(☑ 이라는 글자,
+ * text-decoration: underline) 보이는 줄은 자리를 재서 그린다.
  */
-const MARK_NUDGE_X = -0.12
-const MARK_NUDGE_Y = 0.06
+type Stroke = { x: number; y: number; w: number; kind: 'strike' | 'underline' }
+
+/** 줄을 그릴 자리의 세로 두께. 손으로 그은 흔들림이 들어갈 만큼만 */
+const STROKE_BOX = 8
+
+/** 글자 크기 대비 표시 크기. 1보다 크면 네모를 넘어간다 */
+const MARK_SCALE = 1.55
 
 /** 공책 괘선. 칸마다 줄 간격이 달라서 클래스 대신 값으로 만든다. */
 function ruledGradient(lineHeight: number): string {
@@ -63,7 +70,7 @@ type Command =
   | { kind: 'exec'; name: string; value?: string }
   | { kind: 'size'; px: number }
   /** 형광펜만 따로 둔다. 켜고 끄는 것을 직접 챙겨야 해서 (toggleHighlight) */
-  | { kind: 'highlight' }
+  | { kind: 'highlight'; hex: string }
 
 type Option = {
   key: string
@@ -106,17 +113,32 @@ const STYLE_OPTIONS: Option[] = [
     command: { kind: 'exec', name: 'italic' },
   },
   {
-    key: 'highlight',
-    label: '형광펜',
-    alias: 'highlight marker',
+    key: 'underline',
+    label: '밑줄',
+    alias: 'underline',
+    icon: (
+      <span className="flex flex-col items-center gap-[2px]">
+        <span className="text-[11px] leading-none">가</span>
+        <span
+          className="block h-[2px] w-3 rounded-full"
+          style={{ backgroundColor: UNDERLINE_COLOR }}
+        />
+      </span>
+    ),
+    command: { kind: 'exec', name: 'underline' },
+  },
+  ...HIGHLIGHTS.map((pen) => ({
+    key: `highlight-${pen.key}`,
+    label: `${pen.label} 형광펜`,
+    alias: `highlight marker ${pen.key} ${pen.label}`,
     icon: (
       <span
         className="block h-[3px] w-3 rounded-full"
-        style={{ backgroundColor: HIGHLIGHT }}
+        style={{ backgroundColor: pen.hex }}
       />
     ),
-    command: { kind: 'highlight' },
-  },
+    command: { kind: 'highlight' as const, hex: pen.hex },
+  })),
   ...PENS.map((pen) => ({
     key: `pen-${pen.key}`,
     label: `${pen.label} 펜`,
@@ -155,37 +177,71 @@ function toRgb(hex: string): string {
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`
 }
 
-const HIGHLIGHT_RGBS: string[] = HIGHLIGHT_COLORS.map(toRgb)
+/**
+ * 고른 자리에서 첫 글자를 찾는다.
+ *
+ * 한 줄을 통째로 긁으면 고른 자리의 기준점이 글자가 아니라 그 글자를 담은
+ * 상자가 된다. 상자를 보고 색을 판단하면 안에 칠해진 글자를 못 알아본다.
+ * 그래서 상자 안으로 들어가 첫 글자를 찾아 그것을 본다.
+ */
+function firstTextIn(range: Range): Text | null {
+  if (range.startContainer.nodeType === Node.TEXT_NODE) {
+    return range.startContainer as Text
+  }
+
+  const walker = document.createTreeWalker(
+    range.commonAncestorContainer,
+    NodeFilter.SHOW_TEXT,
+  )
+  let node: Node | null
+  while ((node = walker.nextNode())) {
+    if (node.textContent?.trim() && range.intersectsNode(node)) {
+      return node as Text
+    }
+  }
+  return null
+}
+
+/** 지금 고른 자리에 칠해져 있는 형광펜 색(#hex). 안 칠해졌으면 null */
+function highlightAt(): string | null {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return null
+
+  const text = firstTextIn(selection.getRangeAt(0))
+  const element = text?.parentElement
+  if (!element) return null
+
+  // 칠하지 않은 글자는 투명(rgba(0, 0, 0, 0))이 나온다
+  const painted = getComputedStyle(element).backgroundColor
+  return HIGHLIGHT_COLORS.find((hex) => toRgb(hex) === painted) ?? null
+}
 
 /**
- * 지금 커서 자리가 이미 형광펜으로 칠해져 있는가.
+ * 형광펜을 칠하거나 지운다.
  *
  * hiliteColor 는 굵게·기울임과 달리 껐다 켰다 하는 명령이 아니라 색을 넣는
  * 명령이다. 같은 색을 또 넣어봐야 그대로다. 그래서 칠해져 있는지 직접 보고,
- * 칠해져 있으면 투명으로 되돌려 지운다.
- *
- * 예전 색(노랑)으로 칠해둔 자리도 지울 수 있어야 한다 (lib/stickers.ts).
+ * 같은 색이면 투명으로 되돌려 지운다. 다른 색이면 그 색으로 바꾼다.
  */
-function isHighlighted(): boolean {
-  const selection = window.getSelection()
-  const node = selection?.anchorNode
-  if (!node) return false
-
-  const element = node.nodeType === 1 ? (node as Element) : node.parentElement
-  if (!element) return false
-
-  // 칠하지 않은 글자는 투명(rgba(0, 0, 0, 0))이 나온다
-  return HIGHLIGHT_RGBS.includes(getComputedStyle(element).backgroundColor)
-}
-
-/** 형광펜을 칠하거나 지운다 */
-function toggleHighlight() {
+function toggleHighlight(hex: string) {
   document.execCommand('styleWithCSS', false, 'true')
   document.execCommand(
     'hiliteColor',
     false,
-    isHighlighted() ? 'transparent' : HIGHLIGHT,
+    highlightAt() === hex ? 'transparent' : hex,
   )
+}
+
+/**
+ * 밑줄을 긋거나 지운다.
+ *
+ * 글에는 "밑줄이 그어져 있다"는 사실만 저장한다 (text-decoration: underline).
+ * 실제로 보이는 빨간 줄은 화면에 그린다 — 브라우저가 긋는 줄은 글자색을 따라가
+ * 인쇄한 것처럼 보이기 때문이다. 브라우저 줄은 globals.css 에서 감춘다.
+ */
+function toggleUnderline() {
+  document.execCommand('styleWithCSS', false, 'true')
+  document.execCommand('underline')
 }
 
 /**
@@ -197,6 +253,54 @@ function toggleHighlight() {
  * 저장할 때 이 글자는 걷어낸다 (lib/actions/items.ts).
  */
 const ZERO_WIDTH = '​'
+
+/**
+ * 그 글자가 속한 "줄" — 편집기 바로 아래 자식까지 거슬러 올라간 것.
+ *
+ * contenteditable 은 줄마다 div 를 만든다. 첫 줄만은 div 없이 편집기 바로
+ * 밑에 놓이기도 해서, 그때는 편집기 자신이 줄이 된다.
+ */
+function lineBoxOf(root: HTMLElement, node: Node): Node {
+  let current: Node = node
+  while (current.parentNode && current.parentNode !== root) {
+    current = current.parentNode
+  }
+  return current
+}
+
+/**
+ * 어떤 글자 바로 뒤부터 그 줄 끝까지.
+ *
+ * 체크한 줄에 취소선을 그으려면 "이 체크가 맡은 글자가 어디까지인가"를 알아야
+ * 한다. <br> 을 만나거나 줄 상자가 바뀌면 거기서 끊는다.
+ */
+function lineAfter(root: HTMLElement, text: Text, index: number): Range | null {
+  const line = lineBoxOf(root, text)
+
+  let lastText = text
+  let lastOffset = text.data.length
+
+  const walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+  )
+  walker.currentNode = text
+
+  let node: Node | null
+  while ((node = walker.nextNode())) {
+    if (node.nodeName === 'BR') break
+    if (lineBoxOf(root, node) !== line) break
+    if (node.nodeType === Node.TEXT_NODE) {
+      lastText = node as Text
+      lastOffset = lastText.data.length
+    }
+  }
+
+  const range = document.createRange()
+  range.setStart(text, index + 1)
+  range.setEnd(lastText, lastOffset)
+  return range.collapsed ? null : range
+}
 
 /** 고른 글자를 span 으로 감싸 크기를 준다. execCommand 의 fontSize 는 1~7 뿐이라 직접 한다. */
 function wrapFontSize(px: number) {
@@ -277,7 +381,7 @@ export function PaperBlock({
 }) {
   const [state, formAction] = useActionState(saveBlock, { error: null })
   const narrow = useIsNarrow()
-  const { marker } = useArmedSticker()
+  const { marker, underline } = useArmedSticker()
 
   const editorRef = useRef<HTMLDivElement>(null)
   const hiddenRef = useRef<HTMLInputElement>(null)
@@ -317,6 +421,7 @@ export function PaperBlock({
   const [empty, setEmpty] = useState(() => isBlank(content))
   const [focused, setFocused] = useState(false)
   const [marks, setMarks] = useState<CheckMark[]>([])
+  const [strokes, setStrokes] = useState<Stroke[]>([])
 
   // `/` 를 친 자리. 메뉴에서 고르면 여기부터 커서까지를 지운다.
   const slashRef = useRef<{ node: Text; from: number; to: number } | null>(null)
@@ -446,10 +551,10 @@ export function PaperBlock({
   }
 
   /**
-   * 손을 뗐을 때. 형광펜을 집어들었으면 방금 긁은 만큼 칠한다.
+   * 손을 뗐을 때. 도구를 집어들었으면 방금 긁은 만큼 칠하거나 줄을 긋는다.
    *
-   * 형광펜은 내려놓을 때까지 켜져 있다. 여러 군데를 이어서 칠하는 물건이라
-   * 한 번 칠할 때마다 다시 집어들게 하면 쓸 수가 없다.
+   * 도구는 내려놓을 때까지 켜져 있다. 여러 군데를 이어서 칠하는 물건이라
+   * 한 번 쓸 때마다 다시 집어들게 하면 쓸 수가 없다.
    */
   function handleMouseUp() {
     const root = editorRef.current
@@ -458,7 +563,7 @@ export function PaperBlock({
       selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
 
     const scribbled =
-      marker &&
+      (marker || underline) &&
       root &&
       range &&
       !range.collapsed &&
@@ -466,10 +571,13 @@ export function PaperBlock({
 
     if (!scribbled) return syncPicked()
 
-    toggleHighlight()
-    // 칠한 자리가 그대로 남아 있으면 다음에 그은 데가 어디인지 헷갈린다
+    if (marker) toggleHighlight(marker)
+    else toggleUnderline()
+
+    // 긁은 자리가 그대로 남아 있으면 다음에 그은 데가 어디인지 헷갈린다
     selection!.removeAllRanges()
     setPickedAt(null)
+    scheduleMeasure()
     save()
   }
 
@@ -490,8 +598,9 @@ export function PaperBlock({
 
     const base = root.getBoundingClientRect()
     const found: CheckMark[] = []
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    const drawn: Stroke[] = []
 
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
     let node: Node | null
     while ((node = walker.nextNode())) {
       const text = node as Text
@@ -506,14 +615,46 @@ export function PaperBlock({
 
         const size = rect.height * MARK_SCALE
         found.push({
-          // 글자 한가운데에 표시의 한가운데를 맞추고 조금 민다
-          x: rect.left - base.left + rect.width / 2 - size / 2 + size * MARK_NUDGE_X,
-          y: rect.top - base.top + rect.height / 2 - size / 2 + size * MARK_NUDGE_Y,
+          // 글자 한가운데에 표시의 한가운데를 맞춘다
+          x: rect.left - base.left + rect.width / 2 - size / 2,
+          y: rect.top - base.top + rect.height / 2 - size / 2,
           size,
+        })
+
+        // 체크한 줄은 가로질러 긋는다. 줄바꿈된 줄마다 하나씩
+        const rest = lineAfter(root, text, i)
+        for (const line of rest ? Array.from(rest.getClientRects()) : []) {
+          if (line.width < 2) continue
+          drawn.push({
+            x: line.left - base.left,
+            y: line.top - base.top + line.height / 2 - STROKE_BOX / 2,
+            w: line.width,
+            kind: 'strike',
+          })
+        }
+      }
+    }
+
+    /*
+     * 밑줄. 글에는 사실만 저장돼 있고(text-decoration: underline) 브라우저가
+     * 긋는 줄은 globals.css 에서 감춰뒀다. 여기서 자리를 재서 대신 그린다.
+     * 겹쳐 감싼 경우 안쪽만 그리면 두 번 그어지지 않는다.
+     */
+    for (const el of root.querySelectorAll('u, [style*="underline"]')) {
+      if (el.querySelector('u, [style*="underline"]')) continue
+      for (const line of Array.from(el.getClientRects())) {
+        if (line.width < 2) continue
+        drawn.push({
+          x: line.left - base.left,
+          y: line.bottom - base.top - STROKE_BOX / 2 - 1,
+          w: line.width,
+          kind: 'underline',
         })
       }
     }
+
     setMarks(found)
+    setStrokes(drawn)
   }
 
   /** 글이 바뀐 직후에는 아직 자리가 안 잡혀 있다. 한 프레임 뒤에 잰다 */
@@ -585,7 +726,7 @@ export function PaperBlock({
     } else if (command.kind === 'exec') {
       document.execCommand(command.name, false, command.value)
     } else if (command.kind === 'highlight') {
-      toggleHighlight()
+      toggleHighlight(command.hex)
     } else {
       wrapFontSize(command.px)
     }
@@ -737,6 +878,42 @@ export function PaperBlock({
               d="M5.2 11.6 L10.4 17.2 L19.4 4"
               strokeWidth="1.6"
               opacity="0.45"
+            />
+          </svg>
+        ))}
+
+        {/* 취소선과 밑줄. 손으로 그은 것처럼 살짝 흔들리게 */}
+        {strokes.map((stroke, i) => (
+          <svg
+            key={i}
+            aria-hidden
+            viewBox={`0 0 100 ${STROKE_BOX}`}
+            preserveAspectRatio="none"
+            fill="none"
+            stroke="var(--color-today)"
+            strokeLinecap="round"
+            className="pointer-events-none absolute"
+            style={{
+              left: `${stroke.x}px`,
+              top: `${stroke.y}px`,
+              width: `${stroke.w}px`,
+              height: `${STROKE_BOX}px`,
+            }}
+          >
+            {/*
+              vectorEffect 로 굵기를 화면 기준으로 고정한다. 이 그림은 가로로만
+              늘어나므로, 안 그러면 짧은 줄은 굵고 긴 줄은 가늘어진다.
+            */}
+            <path
+              d="M0 4.4 Q 25 3.2, 50 4.2 T 100 3.8"
+              strokeWidth={stroke.kind === 'strike' ? 2 : 2.2}
+              vectorEffect="non-scaling-stroke"
+            />
+            <path
+              d="M0 5 Q 30 4, 55 4.9 T 100 4.4"
+              strokeWidth="1"
+              opacity="0.4"
+              vectorEffect="non-scaling-stroke"
             />
           </svg>
         ))}

@@ -1,15 +1,17 @@
 'use client'
 
 import { createContext, useContext, useMemo, useState } from 'react'
-import { HIGHLIGHT, STICKERS } from '@/lib/stickers'
+import { HIGHLIGHTS, STICKERS, UNDERLINE_COLOR } from '@/lib/stickers'
 
 /**
- * 스티커 통.
+ * 필통과 스티커 통.
  *
- * 스티커를 하나 누르면 "집어든" 상태가 되고, 그 뒤 페이지 아무 데나 누르면
- * 그 자리에 붙는다. 한 번 더 누르면 내려놓는다.
+ * 여기 있는 것은 전부 "집어드는" 도구다. 하나를 누르면 집어든 상태가 되고,
+ * 그 뒤 글자를 긁거나 페이지를 누르면 그 자리에 쓰인다. 한 번 더 누르면
+ * 내려놓는다. 여러 군데를 이어서 칠하는 물건이라 한 번 쓸 때마다 다시
+ * 집어들게 하면 쓸 수가 없다 (스티커만은 붙이는 즉시 내려놓는다).
  *
- * 펜 색·굵게·기울임·형광펜은 여기 없다. 적던 자리에서 `/` 를 치면 나온다.
+ * 펜 색·굵게·기울임·글자 크기는 여기 없다. 적던 자리에서 `/` 를 치면 나온다.
  * 글을 적다 말고 위로 올라오지 않아도 되게 하기 위해서다.
  */
 /*
@@ -33,16 +35,21 @@ type ArmedState = {
   /** 지금 집어든 스티커 이름. 없으면 null */
   armed: string | null
   setArmed: (key: string | null) => void
-  /** 형광펜을 집어들었는가. 켜두면 긁는 곳마다 계속 칠해진다 */
-  marker: boolean
-  setMarker: (on: boolean) => void
+  /** 집어든 형광펜 색(#hex). 없으면 null */
+  marker: string | null
+  setMarker: (hex: string | null) => void
+  /** 밑줄 자를 집어들었는가 */
+  underline: boolean
+  setUnderline: (on: boolean) => void
 }
 
 const ArmedContext = createContext<ArmedState>({
   armed: null,
   setArmed: () => {},
-  marker: false,
+  marker: null,
   setMarker: () => {},
+  underline: false,
+  setUnderline: () => {},
 })
 
 export function useArmedSticker(): ArmedState {
@@ -51,60 +58,106 @@ export function useArmedSticker(): ArmedState {
 
 export function ToolProvider({ children }: { children: React.ReactNode }) {
   const [armed, setArmedState] = useState<string | null>(null)
-  const [marker, setMarkerState] = useState(false)
+  const [marker, setMarkerState] = useState<string | null>(null)
+  const [underline, setUnderlineState] = useState(false)
 
   /*
-   * 스티커와 형광펜은 한 번에 하나만 든다.
-   * 둘 다 든 채로 페이지를 누르면 무엇을 하려던 건지 알 수 없다.
+   * 도구는 한 번에 하나만 든다.
+   * 둘을 같이 든 채로 글자를 긁으면 무엇을 하려던 건지 알 수 없다.
    */
-  const value = useMemo(
-    () => ({
+  const value = useMemo(() => {
+    function pick(next: {
+      armed?: string | null
+      marker?: string | null
+      underline?: boolean
+    }) {
+      setArmedState(next.armed ?? null)
+      setMarkerState(next.marker ?? null)
+      setUnderlineState(next.underline ?? false)
+    }
+
+    return {
       armed,
       marker,
-      setArmed: (key: string | null) => {
-        setArmedState(key)
-        if (key) setMarkerState(false)
-      },
-      setMarker: (on: boolean) => {
-        setMarkerState(on)
-        if (on) setArmedState(null)
-      },
-    }),
-    [armed, marker],
-  )
+      underline,
+      setArmed: (key: string | null) => pick({ armed: key }),
+      setMarker: (hex: string | null) => pick({ marker: hex }),
+      setUnderline: (on: boolean) => pick({ underline: on }),
+    }
+  }, [armed, marker, underline])
 
   return <ArmedContext.Provider value={value}>{children}</ArmedContext.Provider>
 }
 
+/** 집어든 도구를 나타내는 테두리. 모든 도구가 같은 모양을 쓴다 */
+function toolClass(on: boolean): string {
+  return `grid size-7 shrink-0 cursor-pointer place-items-center rounded-[3px] border transition-all ${
+    on
+      ? 'scale-110 border-accent bg-paper shadow-[0_1px_3px_rgba(58,50,38,.25)]'
+      : 'border-transparent opacity-55 hover:opacity-100'
+  }`
+}
+
 export function Toolbar() {
-  const { armed, setArmed, marker, setMarker } = useArmedSticker()
+  const { armed, setArmed, marker, setMarker, underline, setUnderline } =
+    useArmedSticker()
+
+  const hint = marker
+    ? '칠할 글자를 긁으세요'
+    : underline
+      ? '밑줄 그을 글자를 긁으세요'
+      : armed
+        ? '붙일 자리를 누르세요'
+        : null
 
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
+    <div className="flex min-w-0 items-center gap-1">
       {/*
-        형광펜. 집어들면 끌어서 그은 만큼 칠해진다.
-        이미 칠해진 곳을 그으면 지워진다 — 진짜 형광펜과 다른 점이지만,
+        형광펜 세 자루. 집어들면 끌어서 그은 만큼 칠해진다.
+        같은 색으로 이미 칠해진 곳을 그으면 지워진다 — 진짜 형광펜과 다르지만,
         지우는 방법이 따로 없으면 잘못 칠했을 때 되돌릴 길이 없다.
+        다른 색으로 그으면 그 색으로 바뀐다.
       */}
+      {HIGHLIGHTS.map((pen) => {
+        const on = marker === pen.hex
+        return (
+          <button
+            key={pen.key}
+            type="button"
+            aria-pressed={on}
+            aria-label={`${pen.label} 형광펜`}
+            title={on ? '내려놓기' : `${pen.label} 형광펜 — 칠할 글자를 긁으세요`}
+            onClick={() => setMarker(on ? null : pen.hex)}
+            className={toolClass(on)}
+          >
+            {/* 표지가 노란색이라 노랑 형광펜은 테두리가 없으면 배경에 묻힌다 */}
+            <span
+              aria-hidden
+              className="block h-[9px] w-[15px] rounded-[1px] ring-1 ring-ink/20"
+              style={{ backgroundColor: pen.hex }}
+            />
+          </button>
+        )
+      })}
+
+      {/* 밑줄 자 — 긁은 글자 밑에 빨간 줄을 긋는다 */}
       <button
         type="button"
-        aria-pressed={marker}
-        aria-label="형광펜"
-        title={
-          marker ? '내려놓기' : '형광펜 — 집어든 뒤 칠할 글자를 긁으세요'
-        }
-        onClick={() => setMarker(!marker)}
-        className={`grid size-7 shrink-0 cursor-pointer place-items-center rounded-[3px] border transition-all ${
-          marker
-            ? 'scale-110 border-accent bg-paper shadow-[0_1px_3px_rgba(58,50,38,.25)]'
-            : 'border-transparent opacity-55 hover:opacity-100'
-        }`}
+        aria-pressed={underline}
+        aria-label="밑줄"
+        title={underline ? '내려놓기' : '밑줄 — 그을 글자를 긁으세요'}
+        onClick={() => setUnderline(!underline)}
+        className={toolClass(underline)}
       >
-        <span
-          aria-hidden
-          className="block h-[9px] w-[15px] rounded-[1px]"
-          style={{ backgroundColor: HIGHLIGHT }}
-        />
+        <span aria-hidden className="flex flex-col items-center gap-[3px]">
+          <span className="text-[11px] leading-none font-semibold text-ink">
+            가
+          </span>
+          <span
+            className="block h-[2px] w-[15px] rounded-full"
+            style={{ backgroundColor: UNDERLINE_COLOR }}
+          />
+        </span>
       </button>
 
       {/* 필통과 스티커 통 사이 칸막이 */}
@@ -122,11 +175,7 @@ export function Toolbar() {
               on ? '내려놓기' : `${sticker.label} — 누른 뒤 붙일 자리를 누르세요`
             }
             onClick={() => setArmed(on ? null : sticker.key)}
-            className={`grid size-7 shrink-0 cursor-pointer place-items-center rounded-[3px] border transition-all ${
-              on
-                ? 'scale-110 border-accent bg-paper shadow-[0_1px_3px_rgba(58,50,38,.25)]'
-                : 'border-transparent opacity-55 hover:opacity-100'
-            }`}
+            className={toolClass(on)}
           >
             {/* public/stickers 의 SVG 파일 */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,15 +184,9 @@ export function Toolbar() {
         )
       })}
 
-      {marker && (
-        <span className="ml-1 hidden text-[12px] whitespace-nowrap text-ink-soft sm:inline">
-          칠할 글자를 긁으세요
-        </span>
-      )}
-
-      {armed && (
-        <span className="ml-1 hidden text-[12px] whitespace-nowrap text-ink-soft sm:inline">
-          붙일 자리를 누르세요
+      {hint && (
+        <span className="ml-1 hidden text-[12px] whitespace-nowrap text-ink-soft lg:inline">
+          {hint}
         </span>
       )}
     </div>
