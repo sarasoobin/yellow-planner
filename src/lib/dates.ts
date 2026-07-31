@@ -100,6 +100,16 @@ export function dayNumber(dateISO: string): number {
   return Number(dateISO.slice(8, 10))
 }
 
+/** '2026-07-15' -> '7월 15일 (수)'. 폰 월간에서 고른 날의 머리에 쓴다 */
+export function dayLabel(dateISO: string): string {
+  const date = fromISODate(dateISO)
+  if (!date) return dateISO
+
+  // getDay() 는 일요일이 0이다. 이 앱은 월요일이 첫 칸이라 한 칸씩 당긴다
+  const weekday = WEEKDAY_LABELS[(date.getDay() + 6) % 7]
+  return `${Number(dateISO.slice(5, 7))}월 ${Number(dateISO.slice(8, 10))}일 (${weekday})`
+}
+
 /** '2026-07' -> '7월' */
 export function monthLabel(ym: string): string {
   return `${Number(ym.slice(5, 7))}월`

@@ -1,7 +1,6 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { CalendarCell } from '@/components/calendar-cell'
+import { MonthBoard, type CalendarDay } from '@/components/month-board'
 import { PaperBlock } from '@/components/paper-block'
 import { StickerLayer } from '@/components/sticker-layer'
 import { TallyMark } from '@/components/tally-mark'
@@ -13,8 +12,6 @@ import {
   toBlock,
 } from '@/lib/blocks'
 import {
-  WEEKDAY_LABELS,
-  dayNumber,
   isInMonth,
   monthFirstDay,
   monthGrid,
@@ -75,6 +72,18 @@ export default async function MonthPage({ params }: Params) {
   const stickers = asideItems.filter((i) => i.kind === 'sticker')
   const monthDone = countChecked(memo.content)
 
+  // 격자에 필요한 것만 추려 넘긴다. 달력은 고른 날을 기억해야 해서
+  // 클라이언트 컴포넌트다 (components/month-board.tsx)
+  const weeks: CalendarDay[][] = grid.map((week) =>
+    week.map((date) => ({
+      date,
+      block: events.get(date) ?? EMPTY_BLOCK,
+      taskCount: countLines(tasks.get(date)?.content ?? ''),
+      isToday: date === today,
+      inMonth: isInMonth(date, ym),
+    })),
+  )
+
   return (
     <StickerLayer
       stickers={stickers}
@@ -117,55 +126,17 @@ export default async function MonthPage({ params }: Params) {
 
       {/* 오른쪽 — 달력 */}
       <div className="order-1 flex min-w-0 flex-1 flex-col px-3 py-4 md:order-2 md:px-4">
-        <div className="mb-1 flex pl-7">
-          {WEEKDAY_LABELS.map((label, i) => (
-            <div
-              key={label}
-              className={`flex-1 pb-1 text-center text-[12px] font-semibold ${
-                i === 6 ? 'text-today' : 'text-ink-faint'
-              }`}
-            >
-              {label}
-            </div>
-          ))}
-        </div>
+        <MonthBoard weeks={weeks} ym={ym} path={path} today={today} />
 
-        {/* 남는 세로 공간을 주(週) 수만큼 나눠 가져 칸이 최대한 커진다 */}
-        <div className="flex flex-1 flex-col border-t border-l border-rule">
-          {grid.map((week) => (
-            <div key={week[0]} className="flex min-h-[108px] flex-1">
-              {/* 주차 버튼 — 그 주의 주간 페이지로 (DESIGN.md §5-3) */}
-              {/* 어느 달에서 눌렀는지 함께 넘긴다. 주간에서 "달력으로" 를
-                  누르면 이 달로 돌아온다 (lib/dates.ts weekOwnerMonth 주석) */}
-              <Link
-                href={`/week/${week[0]}?from=${ym}`}
-                aria-label={`${dayNumber(week[0])}일 주간 페이지로 이동`}
-                className="flex w-7 shrink-0 items-center justify-center border-r border-b border-rule text-ink-faint transition-colors hover:bg-frame/50 hover:text-accent"
-              >
-                ›
-              </Link>
-
-              {week.map((date) => (
-                <CalendarCell
-                  key={date}
-                  date={date}
-                  weekStart={week[0]}
-                  ym={ym}
-                  block={events.get(date) ?? EMPTY_BLOCK}
-                  taskCount={countLines(tasks.get(date)?.content ?? '')}
-                  isToday={date === today}
-                  inMonth={isInMonth(date, ym)}
-                  path={path}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-2 text-[12px] text-ink-faint">
+        {/* 안내는 화면에 따라 다르다. 폰에서는 칸에 직접 적을 수 없다 */}
+        <p className="mt-2 hidden text-[12px] text-ink-faint md:block">
           날짜 옆부터 바로 적으면 됩니다. 길어지면 다음 줄로 이어지고, 왼쪽{' '}
           <span className="text-accent">›</span> 나 날짜를 누르면 그 주의 주간
           페이지로 갑니다.
+        </p>
+        <p className="mt-2 text-[12px] text-ink-faint md:hidden">
+          날짜를 누르면 아래에서 그 날을 적습니다. 왼쪽{' '}
+          <span className="text-accent">›</span> 는 그 주의 주간 페이지로 갑니다.
         </p>
       </div>
     </StickerLayer>

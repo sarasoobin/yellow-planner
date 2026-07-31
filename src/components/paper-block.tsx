@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useRef, useState, useSyncExternalStore } from 'react'
+import { useActionState, useRef, useState } from 'react'
 import { saveBlock } from '@/lib/actions/items'
 import { PENS, useArmedSticker } from '@/components/toolbar'
+import { useIsNarrow } from '@/components/use-is-narrow'
 import { HIGHLIGHT } from '@/lib/stickers'
 import { isBlank, toDisplayHtml } from '@/lib/rich-text'
 import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
@@ -22,23 +23,6 @@ import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
 
 const BOX = '☐'
 const CHECKED = '☑'
-
-const NARROW = '(max-width: 767px)'
-
-function subscribeNarrow(onChange: () => void) {
-  const query = window.matchMedia(NARROW)
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
-}
-
-/** 좁은 화면인가. 첫 그림부터 맞는 값이라 메뉴가 한 번 잘못 그려지지 않는다. */
-function useIsNarrow(): boolean {
-  return useSyncExternalStore(
-    subscribeNarrow,
-    () => window.matchMedia(NARROW).matches,
-    () => false, // 서버에서는 화면 폭을 알 수 없다. 넓은 쪽으로 그린다.
-  )
-}
 
 /** 공책 괘선. 칸마다 줄 간격이 달라서 클래스 대신 값으로 만든다. */
 function ruledGradient(lineHeight: number): string {
