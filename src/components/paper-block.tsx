@@ -1,10 +1,10 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { saveBlock } from '@/lib/actions/items'
 import { PENS, useArmedSticker } from '@/components/toolbar'
 import { useIsNarrow } from '@/components/use-is-narrow'
-import { HIGHLIGHT } from '@/lib/stickers'
+import { HIGHLIGHT, HIGHLIGHT_COLORS } from '@/lib/stickers'
 import { isBlank, toDisplayHtml } from '@/lib/rich-text'
 import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
 
@@ -23,6 +23,29 @@ import { SIZES, type ItemKind, type ItemStyle, type SizeKey } from '@/lib/types'
 
 const BOX = '☐'
 const CHECKED = '☑'
+
+/**
+ * 체크한 자리에 덮어 그릴 표시.
+ *
+ * 체크는 글 안의 한 글자(☑)라서 그 글자만 빨갛게 하거나 키울 수가 없다.
+ * CSS 로는 글자 하나를 집을 수 없기 때문이다. 그래서 글자는 그대로 두고,
+ * 그 자리를 재서 위에 빨간 표시를 그린다. 네모를 넘어가도 된다 — 종이에
+ * 색연필로 그으면 원래 칸을 넘어간다.
+ *
+ * 획을 두 번 긋는다. 하나는 진하게, 하나는 살짝 비껴서 옅게. 색연필이 종이에
+ * 긁히면서 남는 결을 흉내낸 것이다.
+ */
+type CheckMark = { x: number; y: number; size: number }
+
+/** 글자 크기 대비 표시 크기. 1보다 크면 네모를 넘어간다 */
+const MARK_SCALE = 1.4
+
+/**
+ * 표시를 글자 한가운데에서 얼마나 밀지 (표시 크기 대비).
+ * 체크의 긴 획이 오른쪽 위로 뻗어서, 가운데에 맞추면 끝이 뒷글자를 건드린다.
+ */
+const MARK_NUDGE_X = -0.12
+const MARK_NUDGE_Y = 0.06
 
 /** 공책 괘선. 칸마다 줄 간격이 달라서 클래스 대신 값으로 만든다. */
 function ruledGradient(lineHeight: number): string {
@@ -126,13 +149,13 @@ const STYLE_OPTIONS: Option[] = [
 
 const OPTIONS: Option[] = [CHECK_OPTION, ...STYLE_OPTIONS]
 
-/** '#F3ED7A' -> 'rgb(243, 237, 122)'. 브라우저가 돌려주는 형식과 맞추려고 */
+/** '#A8DE8A' -> 'rgb(168, 222, 138)'. 브라우저가 돌려주는 형식과 맞추려고 */
 function toRgb(hex: string): string {
   const n = parseInt(hex.slice(1), 16)
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`
 }
 
-const HIGHLIGHT_RGB = toRgb(HIGHLIGHT)
+const HIGHLIGHT_RGBS: string[] = HIGHLIGHT_COLORS.map(toRgb)
 
 /**
  * 지금 커서 자리가 이미 형광펜으로 칠해져 있는가.
@@ -140,6 +163,8 @@ const HIGHLIGHT_RGB = toRgb(HIGHLIGHT)
  * hiliteColor 는 굵게·기울임과 달리 껐다 켰다 하는 명령이 아니라 색을 넣는
  * 명령이다. 같은 색을 또 넣어봐야 그대로다. 그래서 칠해져 있는지 직접 보고,
  * 칠해져 있으면 투명으로 되돌려 지운다.
+ *
+ * 예전 색(노랑)으로 칠해둔 자리도 지울 수 있어야 한다 (lib/stickers.ts).
  */
 function isHighlighted(): boolean {
   const selection = window.getSelection()
@@ -150,7 +175,7 @@ function isHighlighted(): boolean {
   if (!element) return false
 
   // 칠하지 않은 글자는 투명(rgba(0, 0, 0, 0))이 나온다
-  return getComputedStyle(element).backgroundColor === HIGHLIGHT_RGB
+  return HIGHLIGHT_RGBS.includes(getComputedStyle(element).backgroundColor)
 }
 
 /** 형광펜을 칠하거나 지운다 */
@@ -283,11 +308,15 @@ export function PaperBlock({
    * 그래서 두 기기에서 같은 칸을 열어두면 나중에 저장한 쪽이 앞의 것을
    * 조용히 덮어쓴다. 혼자 쓰는 다이어리라 감수하지만, 여럿이 쓰게 되면
    * 저장할 때 updated_at 을 비교해 충돌을 알려주는 장치가 필요하다.
+   *
+   * useRef 가 아니라 useState 로 붙든다. 하는 일은 같지만(처음 만든 객체를
+   * 그대로 계속 돌려준다) 그리는 도중에 ref 를 읽지 않아 규칙에 걸리지 않는다.
    */
-  const initialHtml = useRef({ __html: toDisplayHtml(content) }).current
+  const [initialHtml] = useState(() => ({ __html: toDisplayHtml(content) }))
 
   const [empty, setEmpty] = useState(() => isBlank(content))
   const [focused, setFocused] = useState(false)
+  const [marks, setMarks] = useState<CheckMark[]>([])
 
   // `/` 를 친 자리. 메뉴에서 고르면 여기부터 커서까지를 지운다.
   const slashRef = useRef<{ node: Text; from: number; to: number } | null>(null)
@@ -449,7 +478,62 @@ export function PaperBlock({
     setEmpty(isBlank(editorRef.current?.innerHTML ?? ''))
   }
 
+  /**
+   * 체크한 글자가 화면 어디에 있는지 재둔다. 그 자리에 표시를 그린다.
+   *
+   * 글자 하나하나의 자리는 Range 로만 알 수 있다. 줄바꿈으로 자리가 밀리므로
+   * 내용이 바뀔 때마다, 그리고 창 크기가 바뀔 때마다 다시 잰다.
+   */
+  function measureChecks() {
+    const root = editorRef.current
+    if (!root) return
+
+    const base = root.getBoundingClientRect()
+    const found: CheckMark[] = []
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+
+    let node: Node | null
+    while ((node = walker.nextNode())) {
+      const text = node as Text
+      for (let i = 0; i < text.data.length; i++) {
+        if (text.data[i] !== CHECKED) continue
+
+        const range = document.createRange()
+        range.setStart(text, i)
+        range.setEnd(text, i + 1)
+        const rect = range.getBoundingClientRect()
+        if (!rect.width) continue
+
+        const size = rect.height * MARK_SCALE
+        found.push({
+          // 글자 한가운데에 표시의 한가운데를 맞추고 조금 민다
+          x: rect.left - base.left + rect.width / 2 - size / 2 + size * MARK_NUDGE_X,
+          y: rect.top - base.top + rect.height / 2 - size / 2 + size * MARK_NUDGE_Y,
+          size,
+        })
+      }
+    }
+    setMarks(found)
+  }
+
+  /** 글이 바뀐 직후에는 아직 자리가 안 잡혀 있다. 한 프레임 뒤에 잰다 */
+  function scheduleMeasure() {
+    requestAnimationFrame(measureChecks)
+  }
+
+  useEffect(() => {
+    measureChecks()
+
+    // 창을 줄이면 줄바꿈 자리가 달라져 체크도 따라 움직인다
+    const onResize = () => measureChecks()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+    // 이 칸은 처음 그린 내용을 붙들고 다시 안 받아온다. 한 번만 걸면 된다.
+  }, [])
+
   function handleInput() {
+    scheduleMeasure()
+
     // 줄 앞의 `#` 을 크기로 바꿨다면 `/` 메뉴는 볼 것도 없다
     if (applyMarkdown()) {
       syncEmpty()
@@ -507,6 +591,7 @@ export function PaperBlock({
     }
 
     syncEmpty()
+    scheduleMeasure()
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -540,6 +625,7 @@ export function PaperBlock({
       const ch = text.data[i]
       if (ch !== BOX && ch !== CHECKED) continue
       text.replaceData(i, 1, ch === BOX ? CHECKED : BOX)
+      scheduleMeasure()
       save()
       return
     }
@@ -621,6 +707,39 @@ export function PaperBlock({
           }}
           className="w-full flex-1 break-words whitespace-pre-wrap outline-none"
         />
+
+        {/*
+          체크 표시. 글자 위에 덮어 그린다 (CheckMark 주석).
+          누르는 것은 밑의 글자가 받아야 하므로 이 층은 클릭을 가로채지 않는다.
+        */}
+        {marks.map((mark, i) => (
+          <svg
+            key={i}
+            aria-hidden
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--color-today)"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="pointer-events-none absolute"
+            style={{
+              left: `${mark.x}px`,
+              top: `${mark.y}px`,
+              width: `${mark.size}px`,
+              height: `${mark.size}px`,
+              // 반듯하게 그으면 인쇄한 것처럼 보인다. 살짝 기울인다
+              transform: 'rotate(-7deg)',
+            }}
+          >
+            <path d="M4.5 12.5 L10 18 L20 4.5" strokeWidth="3.4" />
+            {/* 살짝 비껴 그은 옅은 획 — 색연필이 남기는 결 */}
+            <path
+              d="M5.2 11.6 L10.4 17.2 L19.4 4"
+              strokeWidth="1.6"
+              opacity="0.45"
+            />
+          </svg>
+        ))}
 
         {empty && placeholder && (
           <span

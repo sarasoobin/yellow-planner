@@ -17,9 +17,20 @@ export function stickerSrc(key: string | null | undefined): string | null {
 }
 
 /**
- * 형광펜 색. 노란 종이 위에서도 보이도록 살짝 초록빛이 도는 노랑을 쓴다.
+ * 형광펜 색.
+ *
+ * 노랑을 쓰다가 초록으로 바꿨다. 노트 표지도 노랑이라 도구 막대에 놓인 형광펜이
+ * 배경에 묻혀 보이지 않았고, 크림색 종이 위에서도 칠한 자리가 잘 드러나지 않았다.
  *
  * 펜 색과 같은 이유로 토큰이 아니라 값을 직접 적는다 (toolbar.tsx 의 PENS 주석).
  * 글 안에 저장되는 색이라 var() 를 쓰면 sanitize.ts 가 걸러낸다.
  */
-export const HIGHLIGHT = '#F3ED7A'
+export const HIGHLIGHT = '#A8DE8A'
+
+/**
+ * 형광펜으로 칠한 것으로 보는 색들.
+ *
+ * 색을 바꾸기 전에 칠해둔 글이 남아 있다. 지금 색만 보면 옛날에 칠한 자리를
+ * 다시 그어도 안 지워진다. 지우는 쪽은 옛 색까지 알아본다.
+ */
+export const HIGHLIGHT_COLORS = [HIGHLIGHT, '#F3ED7A'] as const
