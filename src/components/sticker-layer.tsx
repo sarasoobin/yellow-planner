@@ -16,6 +16,20 @@ import { STICKER_SCALE, STICKER_SIZE, type Item } from '@/lib/types'
  * 자리는 페이지 크기 대비 %로 저장한다. 창을 줄여도 제자리에 남는다.
  * 크기는 배율로 저장한다. 화면 폭이 달라도 글자와의 비율이 유지된다.
  */
+
+/**
+ * 크기를 바꾸는 동안 그림을 몇 px 짜리로 그려둘지.
+ *
+ * width/height 를 프레임마다 바꾸면 브라우저가 그때마다 SVG 를 그 크기로 다시
+ * 그린다. 별 스티커는 색연필 결을 내려고 feTurbulence 를 쓰는데 이게 비싸서,
+ * 끄는 내내 다시 그리면 손이 뚝뚝 끊긴다.
+ *
+ * 그래서 끄는 동안에는 그림 크기를 이 값으로 붙들어두고 transform 으로만
+ * 늘린다. transform 은 이미 그려둔 것을 늘리는 것이라 다시 그리지 않는다.
+ * 손을 떼면 진짜 크기로 되돌려 또렷하게 만든다.
+ */
+const RASTER = 128
+
 export function StickerLayer({
   stickers,
   date,
@@ -37,18 +51,6 @@ export function StickerLayer({
   const moveRef = useRef<HTMLFormElement>(null)
   const fields = useRef<Record<string, HTMLInputElement | null>>({})
 
-  // 끄는 동안 보여줄 임시 자리. 손을 떼면 저장한다.
-  const [dragged, setDragged] = useState<{
-    id: string
-    x: number
-    y: number
-  } | null>(null)
-
-  // 크기를 바꾸는 동안 보여줄 임시 배율. 손을 떼면 저장한다.
-  const [sizing, setSizing] = useState<{ id: string; scale: number } | null>(
-    null,
-  )
-
   function percentOf(clientX: number, clientY: number) {
     const rect = layerRef.current?.getBoundingClientRect()
     if (!rect) return null
@@ -56,27 +58,6 @@ export function StickerLayer({
       x: Math.min(Math.max(((clientX - rect.left) / rect.width) * 100, 0), 100),
       y: Math.min(Math.max(((clientY - rect.top) / rect.height) * 100, 0), 100),
     }
-  }
-
-  /**
-   * 끌고 있는 손끝이 스티커 한가운데에서 얼마나 멀어졌는지로 배율을 정한다.
-   *
-   * 모서리를 잡고 끄는 것이라, 손끝까지의 거리가 곧 스티커 반지름이다.
-   * 기본 크기일 때 한가운데에서 모서리까지가 √2 × 16px 이므로 그걸로 나눈다.
-   */
-  function scaleFrom(clientX: number, clientY: number, x: number, y: number) {
-    const rect = layerRef.current?.getBoundingClientRect()
-    if (!rect) return null
-
-    const centerX = rect.left + (x / 100) * rect.width
-    const centerY = rect.top + (y / 100) * rect.height
-    const away = Math.hypot(clientX - centerX, clientY - centerY)
-    const base = (STICKER_SIZE / 2) * Math.SQRT2
-
-    return Math.min(
-      Math.max(away / base, STICKER_SCALE.min),
-      STICKER_SCALE.max,
-    )
   }
 
   function handlePlace(event: React.MouseEvent) {
@@ -177,103 +158,192 @@ export function StickerLayer({
           const src = stickerSrc(sticker.content)
           if (!src) return null
 
-          const moving = dragged?.id === sticker.id
-          const resizing = sizing?.id === sticker.id
-          const x = moving ? dragged.x : (sticker.style?.x ?? 50)
-          const y = moving ? dragged.y : (sticker.style?.y ?? 50)
-          const scale = resizing ? sizing.scale : (sticker.style?.scale ?? 1)
-          const size = STICKER_SIZE * scale
-
-          function endMove() {
-            if (!dragged) return
-            saveSpot(sticker.id, dragged.x, dragged.y, scale)
-            setDragged(null)
-          }
-
-          function endResize() {
-            if (!sizing) return
-            saveSpot(sticker.id, x, y, sizing.scale)
-            setSizing(null)
-          }
-
           return (
-            <div
+            <PlacedSticker
               key={sticker.id}
-              style={{ left: `${x}%`, top: `${y}%` }}
-              className="group pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2"
-            >
-              <button
-                type="button"
-                aria-label="스티커 옮기기"
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                  setDragged({ id: sticker.id, x, y })
-                }}
-                onPointerMove={(e) => {
-                  if (!dragged) return
-                  const at = percentOf(e.clientX, e.clientY)
-                  if (at) setDragged({ id: sticker.id, ...at })
-                }}
-                onPointerUp={endMove}
-                onPointerCancel={endMove}
-                // 스티커를 잡을 때 아래 글이 선택되거나 화면이 스크롤되면 안 된다
-                className="block cursor-grab touch-none active:cursor-grabbing"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt=""
-                  draggable={false}
-                  style={{ width: `${size}px`, height: `${size}px` }}
-                  className={`select-none transition-transform ${
-                    moving ? 'scale-110' : ''
-                  }`}
-                />
-              </button>
-
-              <form
-                action={deleteItem}
-                className="absolute -top-1 -right-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
-              >
-                <input type="hidden" name="id" value={sticker.id} />
-                <input type="hidden" name="path" value={path} />
-                <button
-                  type="submit"
-                  aria-label="스티커 떼기"
-                  className="grid size-4 cursor-pointer place-items-center rounded-full border border-rule bg-paper text-[9px] leading-none text-ink-faint hover:text-danger"
-                >
-                  ✕
-                </button>
-              </form>
-
-              {/* 오른쪽 아래 모서리를 끌어 크기를 바꾼다 — 사진 다루듯 */}
-              <button
-                type="button"
-                aria-label="스티커 크기 바꾸기"
-                onPointerDown={(e) => {
-                  e.stopPropagation()
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                  setSizing({ id: sticker.id, scale })
-                }}
-                onPointerMove={(e) => {
-                  if (!resizing) return
-                  const next = scaleFrom(e.clientX, e.clientY, x, y)
-                  if (next) setSizing({ id: sticker.id, scale: next })
-                }}
-                onPointerUp={endResize}
-                onPointerCancel={endResize}
-                className={`absolute -right-1 -bottom-1 grid size-4 cursor-nwse-resize touch-none place-items-center rounded-full border border-rule bg-paper text-[8px] leading-none text-ink-faint transition-opacity hover:text-accent ${
-                  resizing
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-                }`}
-              >
-                ⤡
-              </button>
-            </div>
+              sticker={sticker}
+              src={src}
+              path={path}
+              layerRect={() => layerRef.current?.getBoundingClientRect() ?? null}
+              onCommit={saveSpot}
+            />
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/**
+ * 붙어 있는 스티커 하나.
+ *
+ * 끄는 동안의 상태를 이 안에서만 쥔다. 층에서 쥐면 손을 움직일 때마다 층
+ * 전체가 다시 그려져 스티커가 여러 개일수록 뚝뚝 끊긴다.
+ *
+ * 옮기는 동안에는 left/top 을 건드리지 않고 transform 으로만 민다.
+ * left/top 을 바꾸면 브라우저가 자리를 다시 계산하지만 transform 은 아니다.
+ * 손을 떼는 순간에만 % 로 바꿔 저장한다.
+ */
+function PlacedSticker({
+  sticker,
+  src,
+  path,
+  layerRect,
+  onCommit,
+}: {
+  sticker: Item
+  src: string
+  path: string
+  layerRect: () => DOMRect | null
+  onCommit: (id: string, x: number, y: number, scale: number) => void
+}) {
+  const savedX = sticker.style?.x ?? 50
+  const savedY = sticker.style?.y ?? 50
+  const savedScale = sticker.style?.scale ?? 1
+
+  // 끄는 동안 얼마나 밀렸는지(px). 손을 떼면 % 로 바꿔 저장한다
+  const [shift, setShift] = useState<{ dx: number; dy: number } | null>(null)
+  // 끄는 동안의 배율. 손을 떼면 저장한다
+  const [sizing, setSizing] = useState<number | null>(null)
+
+  const from = useRef({ x: 0, y: 0 })
+  const boxRef = useRef<HTMLDivElement>(null)
+
+  const scale = sizing ?? savedScale
+  const size = STICKER_SIZE * scale
+  const moving = shift !== null
+  const resizing = sizing !== null
+
+  function endMove() {
+    if (!shift) return
+    const rect = layerRect()
+    if (rect) {
+      const x = Math.min(Math.max(savedX + (shift.dx / rect.width) * 100, 0), 100)
+      const y = Math.min(Math.max(savedY + (shift.dy / rect.height) * 100, 0), 100)
+      onCommit(sticker.id, x, y, scale)
+    }
+    setShift(null)
+  }
+
+  function endResize() {
+    if (sizing === null) return
+    onCommit(sticker.id, savedX, savedY, sizing)
+    setSizing(null)
+  }
+
+  return (
+    <div
+      ref={boxRef}
+      style={{
+        left: `${savedX}%`,
+        top: `${savedY}%`,
+        width: `${size}px`,
+        height: `${size}px`,
+        transform: `translate(-50%, -50%) translate(${shift?.dx ?? 0}px, ${shift?.dy ?? 0}px)`,
+      }}
+      className="group pointer-events-auto absolute"
+    >
+      <button
+        type="button"
+        aria-label="스티커 옮기기"
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          from.current = { x: e.clientX, y: e.clientY }
+          setShift({ dx: 0, dy: 0 })
+        }}
+        onPointerMove={(e) => {
+          if (!moving) return
+          setShift({
+            dx: e.clientX - from.current.x,
+            dy: e.clientY - from.current.y,
+          })
+        }}
+        onPointerUp={endMove}
+        onPointerCancel={endMove}
+        // 스티커를 잡을 때 아래 글이 선택되거나 화면이 스크롤되면 안 된다
+        className="block size-full cursor-grab touch-none active:cursor-grabbing"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt=""
+          draggable={false}
+          style={
+            resizing
+              ? {
+                  // 끄는 동안에는 다시 그리지 않는다 (RASTER 주석)
+                  width: `${RASTER}px`,
+                  height: `${RASTER}px`,
+                  transform: `scale(${size / RASTER})`,
+                  transformOrigin: '0 0',
+                }
+              : { width: `${size}px`, height: `${size}px` }
+          }
+          className={`block select-none ${moving ? 'opacity-80' : ''}`}
+        />
+      </button>
+
+      <form
+        action={deleteItem}
+        className="absolute -top-1 -right-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+      >
+        <input type="hidden" name="id" value={sticker.id} />
+        <input type="hidden" name="path" value={path} />
+        <button
+          type="submit"
+          aria-label="스티커 떼기"
+          className="grid size-4 cursor-pointer place-items-center rounded-full border border-rule bg-paper text-[9px] leading-none text-ink-faint hover:text-danger"
+        >
+          ✕
+        </button>
+      </form>
+
+      {/* 오른쪽 아래 모서리를 끌어 크기를 바꾼다 — 사진 다루듯 */}
+      <button
+        type="button"
+        aria-label="스티커 크기 바꾸기"
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          e.currentTarget.setPointerCapture(e.pointerId)
+
+          // 한가운데는 크기가 바뀌어도 그대로다. 누를 때 한 번만 재둔다.
+          // 끄는 내내 재면 그때마다 자리를 다시 계산하느라 손이 끊긴다.
+          const box = boxRef.current?.getBoundingClientRect()
+          if (box) {
+            from.current = {
+              x: box.left + box.width / 2,
+              y: box.top + box.height / 2,
+            }
+          }
+          setSizing(scale)
+        }}
+        onPointerMove={(e) => {
+          if (!resizing) return
+
+          /*
+           * 모서리를 잡고 끄는 것이라 스티커 한가운데에서 손끝까지의 거리가
+           * 곧 반지름이다. 기본 크기일 때 한가운데에서 모서리까지가
+           * √2 × 16px 이므로 그것으로 나눠 배율을 낸다.
+           */
+          const away = Math.hypot(
+            e.clientX - from.current.x,
+            e.clientY - from.current.y,
+          )
+          const next = away / ((STICKER_SIZE / 2) * Math.SQRT2)
+          setSizing(
+            Math.min(Math.max(next, STICKER_SCALE.min), STICKER_SCALE.max),
+          )
+        }}
+        onPointerUp={endResize}
+        onPointerCancel={endResize}
+        className={`absolute -right-1 -bottom-1 grid size-4 cursor-nwse-resize touch-none place-items-center rounded-full border border-rule bg-paper text-[8px] leading-none text-ink-faint transition-opacity hover:text-accent ${
+          resizing
+            ? 'opacity-100'
+            : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+        }`}
+      >
+        ⤡
+      </button>
     </div>
   )
 }

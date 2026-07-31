@@ -16,10 +16,15 @@
   -->
   <defs>
     <filter id="crayon" x="-25%" y="-25%" width="150%" height="150%">
+      <!--
+        numOctaves 는 결의 층 수다. 3 이면 조금 더 곱지만 그리는 값이 비싸다.
+        크기를 끌어 바꿀 때 이 필터를 다시 계산하므로 2 로 둔다.
+        눈으로는 거의 차이가 없다.
+      -->
       <feTurbulence
         type="fractalNoise"
         baseFrequency="0.8"
-        numOctaves="3"
+        numOctaves="2"
         seed="7"
         result="grain"
       />
