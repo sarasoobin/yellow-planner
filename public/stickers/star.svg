@@ -1,11 +1,60 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <!-- 손으로 그린 듯 꼭짓점이 살짝 어긋난 별 -->
-  <path
-    d="M12 2.9 14.6 8.5 20.8 9.3 16.2 13.5 17.4 19.7 12 16.6 6.5 19.6 7.8 13.4 3.3 9.2 9.5 8.5Z"
+  <!--
+    색연필로 그린 별.
+
+    자로 잰 별은 종이 같지 않아서 세 가지를 넣었다.
+      1. 꼭짓점 길이와 각도를 조금씩 어긋나게 잡는다
+      2. 시작과 끝이 맞아떨어지지 않고 살짝 지나친다 (한 번에 그은 흔적)
+      3. 획 가장자리를 흔든다 — feTurbulence 로 잔 결을 낸다
+
+    획을 두 번 긋는다. 진한 획 하나, 살짝 비껴서 옅은 획 하나.
+    색연필이 같은 자리를 두 번 지나며 남기는 모양이다.
+  -->
+  <defs>
+    <filter id="crayon" x="-25%" y="-25%" width="150%" height="150%">
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.8"
+        numOctaves="3"
+        seed="7"
+        result="grain"
+      />
+      <feDisplacementMap
+        in="SourceGraphic"
+        in2="grain"
+        scale="0.9"
+        xChannelSelector="R"
+        yChannelSelector="G"
+      />
+    </filter>
+  </defs>
+
+  <g
+    filter="url(#crayon)"
     stroke="#C1453C"
-    stroke-width="1.6"
+    stroke-linecap="round"
     stroke-linejoin="round"
-    fill="#C1453C"
-    fill-opacity="0.16"
-  />
+    fill="none"
+  >
+    <!-- 종이에 눌린 자국처럼 아주 옅게 깔아둔 면 -->
+    <path
+      d="M12.1 3.1 14.3 9.1 20.9 9.5 15.7 13.6 17.5 20.2 12 16.6 6.4 20.1 8.3 13.5 3.2 9.3 9.8 9.0Z"
+      fill="#C1453C"
+      fill-opacity="0.1"
+      stroke="none"
+    />
+
+    <!-- 진한 획. 끝이 시작을 조금 지나쳐 겹친다 -->
+    <path
+      d="M11.4 4.6 12.1 3.0 14.3 9.1 20.9 9.5 15.7 13.6 17.5 20.2 12 16.6 6.4 20.1 8.3 13.5 3.2 9.3 9.8 9.0 12.1 3.0 12.6 4.2"
+      stroke-width="1.7"
+    />
+
+    <!-- 옅은 결 — 같은 자리를 살짝 비껴 한 번 더 -->
+    <path
+      d="M12.4 3.6 14.7 9.5 20.2 9.8 15.3 13.9 17.0 19.6 12.1 17.1 6.9 19.7 8.7 13.9 3.9 9.7 9.6 9.4"
+      stroke-width="0.8"
+      opacity="0.5"
+    />
+  </g>
 </svg>

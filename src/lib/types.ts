@@ -40,7 +40,16 @@ export type ItemStyle = {
   /** kind='sticker' 일 때 붙인 자리. 페이지 크기 대비 % 라서 화면이 좁아져도 안 밀린다 */
   x?: number
   y?: number
+  /**
+   * kind='sticker' 의 크기 배율. 없으면 1.
+   * 사진을 붙이고 모서리를 끌어 키우듯 스티커도 끌어서 키운다.
+   */
+  scale?: number
 }
+
+/** 스티커 기본 크기(px)와 늘릴 수 있는 범위 */
+export const STICKER_SIZE = 32
+export const STICKER_SCALE = { min: 0.5, max: 4 } as const
 
 /** Free Note 페이지에 붙인 스티커의 기준일. 실제 날짜와 겹치지 않는 자리표시자다. */
 export const FREE_NOTE_ANCHOR = '1970-01-01'

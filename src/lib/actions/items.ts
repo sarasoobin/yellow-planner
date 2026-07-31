@@ -5,7 +5,12 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { isBlank } from '@/lib/rich-text'
 import { sanitizeRich } from '@/lib/sanitize'
-import { ITEM_KINDS, type FormState, type ItemStyle } from '@/lib/types'
+import {
+  ITEM_KINDS,
+  STICKER_SCALE,
+  type FormState,
+  type ItemStyle,
+} from '@/lib/types'
 
 /**
  * 노트에 적은 것.
@@ -35,6 +40,11 @@ const STYLE = z.object({
   size: z.enum(['sm', 'md', 'lg', 'xl']).optional(),
   x: z.number().min(0).max(100).optional(),
   y: z.number().min(0).max(100).optional(),
+  scale: z
+    .number()
+    .min(STICKER_SCALE.min)
+    .max(STICKER_SCALE.max)
+    .optional(),
 })
 
 /**
@@ -154,17 +164,30 @@ export async function saveBlock(
   return { error: null }
 }
 
-/** 붙인 자리. 페이지 크기 대비 %라서 창을 줄여도 제자리에 남는다. */
+/**
+ * 붙인 자리와 크기.
+ * 자리는 페이지 크기 대비 %라서 창을 줄여도 제자리에 남는다.
+ * 크기는 배율이다. 안 넘어오면 1 (기본 크기).
+ */
 const SPOT = z.object({
   x: z.coerce.number().min(0).max(100),
   y: z.coerce.number().min(0).max(100),
+  scale: z.coerce
+    .number()
+    .min(STICKER_SCALE.min)
+    .max(STICKER_SCALE.max)
+    .catch(1),
 })
 
 /** 페이지 아무 데나 스티커를 붙인다. */
 export async function placeSticker(formData: FormData) {
   const sticker = String(formData.get('sticker') ?? '')
   const date = DATE.safeParse(formData.get('date'))
-  const spot = SPOT.safeParse({ x: formData.get('x'), y: formData.get('y') })
+  const spot = SPOT.safeParse({
+    x: formData.get('x'),
+    y: formData.get('y'),
+    scale: formData.get('scale'),
+  })
   if (!sticker || !date.success || !spot.success) return
 
   const supabase = await createClient()
@@ -187,7 +210,11 @@ export async function placeSticker(formData: FormData) {
 /** 붙여둔 스티커를 끌어서 옮긴다. */
 export async function moveSticker(formData: FormData) {
   const id = String(formData.get('id') ?? '')
-  const spot = SPOT.safeParse({ x: formData.get('x'), y: formData.get('y') })
+  const spot = SPOT.safeParse({
+    x: formData.get('x'),
+    y: formData.get('y'),
+    scale: formData.get('scale'),
+  })
   if (!id || !spot.success) return
 
   const supabase = await createClient()

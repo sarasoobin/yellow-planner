@@ -254,18 +254,30 @@ function toggleUnderline() {
  */
 const ZERO_WIDTH = '​'
 
+/** 줄을 나누는 태그. 나머지(span·b·i·u·font…)는 글자를 꾸미는 것일 뿐이다 */
+const LINE_TAGS = new Set(['DIV', 'P'])
+
 /**
- * 그 글자가 속한 "줄" — 편집기 바로 아래 자식까지 거슬러 올라간 것.
+ * 그 글자가 속한 "줄".
  *
  * contenteditable 은 줄마다 div 를 만든다. 첫 줄만은 div 없이 편집기 바로
  * 밑에 놓이기도 해서, 그때는 편집기 자신이 줄이 된다.
+ *
+ * ⚠️ 꾸미기 태그를 줄로 세면 안 된다. 굵게·색·크기를 주면 그 글자가 span 안에
+ * 들어가는데, span 을 새 줄로 보면 취소선이 거기서 끊긴다. 체크박스를 먼저 넣고
+ * 글자를 꾸며 적었을 때 이미 적은 글에 줄이 안 그어지던 원인이 이것이었다.
  */
 function lineBoxOf(root: HTMLElement, node: Node): Node {
-  let current: Node = node
-  while (current.parentNode && current.parentNode !== root) {
-    current = current.parentNode
+  let element =
+    node.nodeType === Node.ELEMENT_NODE
+      ? (node as Element)
+      : node.parentElement
+
+  while (element && element !== root) {
+    if (LINE_TAGS.has(element.tagName)) return element
+    element = element.parentElement
   }
-  return current
+  return root
 }
 
 /**
