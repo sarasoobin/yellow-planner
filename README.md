@@ -272,6 +272,7 @@ docs/                           스크린샷과 손그림 시안
 | [DESIGN.md](DESIGN.md) | 컬러 · 타이포 · 레이아웃 · 반응형 규칙 |
 | [PLAN.md](PLAN.md) | 3일 개발 계획과 완료 기준 |
 | [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 이력 |
+| [docs/회고-v1.0.0.md](docs/회고-v1.0.0.md) | 왜 그렇게 만들었나, 오래 걸린 문제와 해결 |
 
 ---
 
