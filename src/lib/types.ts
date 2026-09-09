@@ -57,7 +57,7 @@ export const FREE_NOTE_ANCHOR = '1970-01-01'
 export type Item = {
   id: string
   kind: ItemKind
-  /** 'YYYY-MM-DD'. kind별 의미는 supabase/schema.sql 주석 참고 */
+  /** 'YYYY-MM-DD'. kind별 의미는 supabase/latest.sql 주석 참고 */
   date: string
   content: string
   is_done: boolean

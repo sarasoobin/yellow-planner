@@ -9,8 +9,7 @@ import type { FormState } from '@/lib/types'
  * 메모(notes) 저장.
  *
  * 주간 메모는 한 사람이 한 주에 하나, Free Note는 한 사람당 하나다.
- * DB에 부분 유니크 인덱스로 걸려 있지만(schema.sql), upsert의 onConflict는
- * 부분 인덱스를 대상으로 지정하기 번거로워 "있으면 update, 없으면 insert"로 처리한다.
+ * 부분 유니크 인덱스를 쓰므로 ON CONFLICT 처리는 DB 함수가 맡는다.
  */
 
 const schema = z.object({
@@ -20,6 +19,13 @@ const schema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
 })
+
+function dbError(error: { code?: string } | null): string {
+  if (error?.code === '42883' || error?.code === 'PGRST202') {
+    return 'DB가 최신이 아닙니다. supabase/latest.sql 을 Supabase SQL Editor에서 실행해주세요.'
+  }
+  return '저장하지 못했습니다. 잠시 후 다시 시도해주세요.'
+}
 
 export async function saveNote(
   _prev: FormState,
@@ -33,7 +39,6 @@ export async function saveNote(
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
   const { content, weekStart } = parsed.data
-  const kind = weekStart ? 'week' : 'free'
 
   const supabase = await createClient()
   const {
@@ -41,29 +46,18 @@ export async function saveNote(
   } = await supabase.auth.getUser()
   if (!user) return { error: '로그인이 필요합니다.' }
 
-  // RLS가 남의 행을 막아주므로 이 조회는 항상 내 메모만 찾는다
-  let query = supabase.from('notes').select('id').eq('kind', kind).limit(1)
-  query = weekStart
-    ? query.eq('week_start', weekStart)
-    : query.is('week_start', null)
+  // 부분 유니크 인덱스와 ON CONFLICT를 DB 함수에서 함께 써 동시 저장도 한 행으로 처리한다.
+  const { error } = await supabase.rpc('save_note', {
+    p_week_start: weekStart,
+    p_content: content,
+  })
 
-  const { data: existing } = await query.maybeSingle()
+  if (error) return { error: dbError(error) }
 
-  const { error } = existing
-    ? await supabase
-        .from('notes')
-        .update({ content, updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
-    : await supabase.from('notes').insert({
-        user_id: user.id,
-        kind,
-        week_start: weekStart,
-        content,
-      })
-
-  if (error) return { error: '저장하지 못했습니다. 잠시 후 다시 시도해주세요.' }
-
-  const path = formData.get('path')
-  revalidatePath(typeof path === 'string' && path.startsWith('/') ? path : '/')
+  const rawPath = formData.get('path')
+  const path = typeof rawPath === 'string' ? rawPath : ''
+  const allowed =
+    path === '/note' || /^\/week\/\d{4}-\d{2}-\d{2}$/.test(path)
+  revalidatePath(allowed ? path : '/note')
   return { error: null }
 }

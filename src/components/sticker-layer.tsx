@@ -1,10 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useActionState, useRef, useState } from 'react'
 import { deleteItem, moveSticker, placeSticker } from '@/lib/actions/items'
 import { useArmedSticker } from '@/components/toolbar'
 import { stickerSrc } from '@/lib/stickers'
-import { STICKER_SCALE, STICKER_SIZE, type Item } from '@/lib/types'
+import { STICKER_SCALE, STICKER_SIZE, type FormState, type Item } from '@/lib/types'
+
+const EMPTY: FormState = { error: null }
 
 /**
  * 페이지 위에 스티커를 자유롭게 붙이는 층.
@@ -50,6 +52,8 @@ export function StickerLayer({
   const placeRef = useRef<HTMLFormElement>(null)
   const moveRef = useRef<HTMLFormElement>(null)
   const fields = useRef<Record<string, HTMLInputElement | null>>({})
+  const [placeState, placeAction, placing] = useActionState(placeSticker, EMPTY)
+  const [moveState, moveAction, moving] = useActionState(moveSticker, EMPTY)
 
   function percentOf(clientX: number, clientY: number) {
     const rect = layerRef.current?.getBoundingClientRect()
@@ -94,7 +98,7 @@ export function StickerLayer({
       {children}
 
       {/* 저장 전용 폼. 화면에는 보이지 않는다. */}
-      <form ref={placeRef} action={placeSticker} className="hidden">
+      <form ref={placeRef} action={placeAction} className="hidden">
         <input type="hidden" name="date" value={date} />
         <input type="hidden" name="path" value={path} />
         <input
@@ -120,7 +124,7 @@ export function StickerLayer({
         />
       </form>
 
-      <form ref={moveRef} action={moveSticker} className="hidden">
+      <form ref={moveRef} action={moveAction} className="hidden">
         <input type="hidden" name="path" value={path} />
         <input
           ref={(el) => {
@@ -170,6 +174,20 @@ export function StickerLayer({
           )
         })}
       </div>
+
+      {(placeState.error || moveState.error) && (
+        <p
+          role="alert"
+          className="pointer-events-none absolute right-2 bottom-2 z-30 max-w-xs bg-paper/95 px-2 py-1 text-[11px] text-danger shadow-notebook"
+        >
+          {placeState.error || moveState.error}
+        </p>
+      )}
+      {(placing || moving) && (
+        <p className="pointer-events-none absolute right-2 bottom-2 z-30 bg-paper/95 px-2 py-1 text-[11px] text-ink-faint shadow-notebook">
+          저장 중…
+        </p>
+      )}
     </div>
   )
 }
@@ -197,6 +215,7 @@ function PlacedSticker({
   layerRect: () => DOMRect | null
   onCommit: (id: string, x: number, y: number, scale: number) => void
 }) {
+  const [deleteState, deleteAction, deleting] = useActionState(deleteItem, EMPTY)
   /*
    * 방금 놓은 자리.
    *
@@ -327,19 +346,29 @@ function PlacedSticker({
       </button>
 
       <form
-        action={deleteItem}
+        action={deleteAction}
         className="absolute -top-1 -right-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
       >
         <input type="hidden" name="id" value={sticker.id} />
         <input type="hidden" name="path" value={path} />
         <button
           type="submit"
+          disabled={deleting}
           aria-label="스티커 떼기"
           className="grid size-4 cursor-pointer place-items-center rounded-full border border-rule bg-paper text-[9px] leading-none text-ink-faint hover:text-danger"
         >
           ✕
         </button>
       </form>
+
+      {deleteState.error && (
+        <span
+          role="alert"
+          className="absolute top-5 right-0 w-28 bg-paper px-1 py-0.5 text-[10px] text-danger shadow-notebook"
+        >
+          {deleteState.error}
+        </span>
+      )}
 
       {/* 오른쪽 아래 모서리를 끌어 크기를 바꾼다 — 사진 다루듯 */}
       <button

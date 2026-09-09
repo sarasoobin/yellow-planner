@@ -90,11 +90,6 @@ alter table public.items add constraint items_content_check
 create index if not exists items_user_kind_date_idx on public.items (user_id, kind, date);
 create index if not exists items_user_date_idx      on public.items (user_id, date);
 
--- 그날의 한 줄은 하루에 하나만
-create unique index if not exists items_daily_uniq
-  on public.items (user_id, date) where kind = 'daily';
-
-
 -- ------------------------------------------------------------
 -- 3) 메모 (notes) — 주간 메모 + Free Note
 -- ------------------------------------------------------------
@@ -120,8 +115,115 @@ create unique index if not exists notes_free_uniq
   on public.notes (user_id) where kind = 'free';
 
 
+-- ------------------------------------------------------------
+-- 4) 자동 저장 — 동시에 저장해도 한 칸은 한 행
+--
+-- 예전 줄 단위 데이터는 같은 칸의 첫 행에 합친 뒤, 유니크 인덱스를 건다.
+-- 이후 서버 액션은 아래 함수를 통해 ON CONFLICT로 저장한다.
+-- ------------------------------------------------------------
+with grouped as (
+  select
+    user_id,
+    kind,
+    date,
+    (array_agg(id order by sort_order, created_at, id))[1] as keep_id,
+    string_agg(content, '<br>' order by sort_order, created_at, id) as merged_content
+  from public.items
+  where kind in ('year', 'month', 'event', 'task', 'daily')
+  group by user_id, kind, date
+  having count(*) > 1
+), updated as (
+  update public.items as item
+  set content = grouped.merged_content
+  from grouped
+  where item.id = grouped.keep_id
+)
+delete from public.items as item
+using grouped
+where item.user_id = grouped.user_id
+  and item.kind = grouped.kind
+  and item.date = grouped.date
+  and item.id <> grouped.keep_id;
+
+drop index if exists public.items_daily_uniq;
+create unique index if not exists items_one_block_per_slot_uniq
+  on public.items (user_id, kind, date)
+  where kind in ('year', 'month', 'event', 'task', 'daily');
+
+create or replace function public.save_item_block(
+  p_kind text,
+  p_date date,
+  p_content text,
+  p_color text,
+  p_style jsonb
+)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+
+  if p_kind not in ('year', 'month', 'event', 'task', 'daily') then
+    raise exception '저장할 자리를 찾지 못했습니다.';
+  end if;
+
+  if p_content = '' then
+    delete from public.items
+    where user_id = auth.uid() and kind = p_kind and date = p_date;
+    return;
+  end if;
+
+  insert into public.items (user_id, kind, date, content, color, style)
+  values (auth.uid(), p_kind, p_date, p_content, p_color, coalesce(p_style, '{}'::jsonb))
+  on conflict (user_id, kind, date)
+    where kind in ('year', 'month', 'event', 'task', 'daily')
+  do update set
+    content = excluded.content,
+    color = excluded.color,
+    style = excluded.style;
+end;
+$$;
+
+create or replace function public.save_note(
+  p_week_start date,
+  p_content text
+)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
+
+  if p_week_start is null then
+    insert into public.notes (user_id, kind, week_start, content)
+    values (auth.uid(), 'free', null, p_content)
+    on conflict (user_id) where kind = 'free'
+    do update set content = excluded.content, updated_at = now();
+  else
+    insert into public.notes (user_id, kind, week_start, content)
+    values (auth.uid(), 'week', p_week_start, p_content)
+    on conflict (user_id, week_start) where kind = 'week'
+    do update set content = excluded.content, updated_at = now();
+  end if;
+end;
+$$;
+
+revoke all on function public.save_item_block(text, date, text, text, jsonb) from public, anon;
+revoke all on function public.save_note(date, text) from public, anon;
+grant execute on function public.save_item_block(text, date, text, text, jsonb) to authenticated;
+grant execute on function public.save_note(date, text) to authenticated;
+
+
 -- ============================================================
---  4) RLS — 남의 데이터는 DB가 아예 안 내준다
+--  5) RLS — 남의 데이터는 DB가 아예 안 내준다
 --
 --  코드에서 필터를 깜빡해도, API를 직접 불러도 뚫리지 않는다.
 --  (select auth.uid()) 로 감싸면 행마다 다시 계산하지 않아 빠르다.

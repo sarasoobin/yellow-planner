@@ -5,8 +5,8 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { isBlank } from '@/lib/rich-text'
 import { sanitizeRich } from '@/lib/sanitize'
+import { STICKERS } from '@/lib/stickers'
 import {
-  ITEM_KINDS,
   STICKER_SCALE,
   type FormState,
   type ItemStyle,
@@ -32,6 +32,14 @@ const HEX = z.string().regex(/^#[0-9A-Fa-f]{6}$/, '색 형식이 올바르지 �
 
 /** 한 칸에 담을 수 있는 글자 수. DB 제약과 같은 값이어야 한다. */
 const MAX_LENGTH = 5000
+
+/** 종이 한 칸으로 저장하는 종류. sticker는 여러 장을 붙일 수 있어 별도 액션만 쓴다. */
+const BLOCK_KINDS = ['year', 'month', 'event', 'task', 'daily'] as const
+const STICKER_KEYS = STICKERS.map((sticker) => sticker.key) as [
+  (typeof STICKERS)[number]['key'],
+  ...(typeof STICKERS)[number]['key'][],
+]
+const ID = z.uuid('항목을 찾지 못했습니다.')
 
 const STYLE = z.object({
   bold: z.boolean().optional(),
@@ -68,7 +76,12 @@ function parseStyle(raw: FormDataEntryValue | null): ItemStyle {
  * 둘 다 "코드는 새 기능인데 DB가 아직 옛날"일 때 나온다.
  */
 function dbError(error: { code?: string } | null, fallback: string): string {
-  if (error?.code === '42703' || error?.code === '23514') {
+  if (
+    error?.code === '42703' ||
+    error?.code === '23514' ||
+    error?.code === '42883' ||
+    error?.code === 'PGRST202'
+  ) {
     return 'DB가 최신이 아닙니다. supabase/latest.sql 을 Supabase SQL Editor에서 실행해주세요.'
   }
   return fallback
@@ -76,8 +89,16 @@ function dbError(error: { code?: string } | null, fallback: string): string {
 
 /** 화면을 새로 그릴 경로. 액션마다 어디서 불렸는지 달라서 폼에서 함께 넘긴다. */
 function revalidateFrom(formData: FormData) {
-  const path = formData.get('path')
-  revalidatePath(typeof path === 'string' && path.startsWith('/') ? path : '/')
+  const raw = formData.get('path')
+  const path = typeof raw === 'string' ? raw : ''
+  const allowed =
+    path === '/cover' ||
+    path === '/note' ||
+    /^\/month\/\d{4}-(0[1-9]|1[0-2])$/.test(path) ||
+    /^\/week\/\d{4}-\d{2}-\d{2}$/.test(path)
+
+  // 폼 값은 브라우저에서 바꿀 수 있다. 이 앱이 실제로 가진 장만 다시 그린다.
+  revalidatePath(allowed ? path : '/cover')
 }
 
 /**
@@ -91,7 +112,7 @@ export async function saveBlock(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const kind = z.enum(ITEM_KINDS).safeParse(formData.get('kind'))
+  const kind = z.enum(BLOCK_KINDS).safeParse(formData.get('kind'))
   const date = DATE.safeParse(formData.get('date'))
   if (!kind.success || !date.success) {
     return { error: '저장할 자리를 찾지 못했습니다.' }
@@ -126,39 +147,19 @@ export async function saveBlock(
   } = await supabase.auth.getUser()
   if (!user) return { error: '로그인이 필요합니다.' }
 
-  const { data: rows } = await supabase
-    .from('items')
-    .select('id')
-    .eq('kind', kind.data)
-    .eq('date', date.data)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
-
-  const ids = (rows ?? []).map((row) => row.id as string)
-
-  if (!content) {
-    if (ids.length) await supabase.from('items').delete().in('id', ids)
-    revalidateFrom(formData)
-    return { error: null }
-  }
-
-  const patch = {
-    content,
-    color: color.success ? color.data : null,
-    style,
-  }
-
-  if (ids.length) {
-    const [keep, ...rest] = ids
-    const { error } = await supabase.from('items').update(patch).eq('id', keep)
-    if (rest.length) await supabase.from('items').delete().in('id', rest)
-    if (error) return { error: dbError(error, '저장하지 못했습니다.') }
-  } else {
-    const { error } = await supabase
-      .from('items')
-      .insert({ ...patch, kind: kind.data, date: date.data, user_id: user.id })
-    if (error) return { error: dbError(error, '저장하지 못했습니다.') }
-  }
+  /*
+   * 조회 뒤 insert하는 방식은 탭 두 개가 동시에 비어 있는 칸을 저장할 때
+   * 중복 행을 만들 수 있다. DB 함수는 유니크 인덱스와 ON CONFLICT를 같은
+   * 트랜잭션에서 써서 한 칸을 언제나 한 행으로 지킨다.
+   */
+  const { error } = await supabase.rpc('save_item_block', {
+    p_kind: kind.data,
+    p_date: date.data,
+    p_content: content,
+    p_color: color.success ? color.data : null,
+    p_style: style,
+  })
+  if (error) return { error: dbError(error, '저장하지 못했습니다. 잠시 후 다시 시도해주세요.') }
 
   revalidateFrom(formData)
   return { error: null }
@@ -180,56 +181,93 @@ const SPOT = z.object({
 })
 
 /** 페이지 아무 데나 스티커를 붙인다. */
-export async function placeSticker(formData: FormData) {
-  const sticker = String(formData.get('sticker') ?? '')
+export async function placeSticker(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const sticker = z.enum(STICKER_KEYS).safeParse(formData.get('sticker'))
   const date = DATE.safeParse(formData.get('date'))
   const spot = SPOT.safeParse({
     x: formData.get('x'),
     y: formData.get('y'),
     scale: formData.get('scale'),
   })
-  if (!sticker || !date.success || !spot.success) return
+  if (!sticker.success || !date.success || !spot.success) {
+    return { error: '스티커 정보를 확인하지 못했습니다.' }
+  }
 
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return
+  if (!user) return { error: '로그인이 필요합니다.' }
 
-  await supabase.from('items').insert({
+  const { error } = await supabase.from('items').insert({
     kind: 'sticker',
     date: date.data,
-    content: sticker,
+    content: sticker.data,
     user_id: user.id,
     style: spot.data,
   })
+  if (error) return { error: dbError(error, '스티커를 붙이지 못했습니다. 다시 시도해주세요.') }
 
   revalidateFrom(formData)
+  return { error: null }
 }
 
 /** 붙여둔 스티커를 끌어서 옮긴다. */
-export async function moveSticker(formData: FormData) {
-  const id = String(formData.get('id') ?? '')
+export async function moveSticker(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const id = ID.safeParse(formData.get('id'))
   const spot = SPOT.safeParse({
     x: formData.get('x'),
     y: formData.get('y'),
     scale: formData.get('scale'),
   })
-  if (!id || !spot.success) return
+  if (!id.success || !spot.success) {
+    return { error: '스티커 정보를 확인하지 못했습니다.' }
+  }
 
   const supabase = await createClient()
-  await supabase.from('items').update({ style: spot.data }).eq('id', id)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: '로그인이 필요합니다.' }
+
+  const { error } = await supabase
+    .from('items')
+    .update({ style: spot.data })
+    .eq('id', id.data)
+    .eq('kind', 'sticker')
+  if (error) return { error: '스티커를 옮기지 못했습니다. 다시 시도해주세요.' }
 
   revalidateFrom(formData)
+  return { error: null }
 }
 
 /** 스티커 떼기 */
-export async function deleteItem(formData: FormData) {
-  const id = String(formData.get('id') ?? '')
-  if (!id) return
+export async function deleteItem(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const id = ID.safeParse(formData.get('id'))
+  if (!id.success) return { error: '스티커 정보를 확인하지 못했습니다.' }
 
   const supabase = await createClient()
-  await supabase.from('items').delete().eq('id', id)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: '로그인이 필요합니다.' }
+
+  const { error } = await supabase
+    .from('items')
+    .delete()
+    .eq('id', id.data)
+    .eq('kind', 'sticker')
+  if (error) return { error: '스티커를 떼지 못했습니다. 다시 시도해주세요.' }
 
   revalidateFrom(formData)
+  return { error: null }
 }

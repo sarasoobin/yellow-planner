@@ -391,13 +391,14 @@ export function PaperBlock({
   fontSize?: number
   className?: string
 }) {
-  const [state, formAction] = useActionState(saveBlock, { error: null })
+  const [state, formAction, pending] = useActionState(saveBlock, { error: null })
   const narrow = useIsNarrow()
   const { marker, underline } = useArmedSticker()
 
   const editorRef = useRef<HTMLDivElement>(null)
   const hiddenRef = useRef<HTMLInputElement>(null)
   const saved = useRef<string | null>(null)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /*
    * 처음 그릴 때의 내용을 객체째로 붙들어두고 다시는 바꾸지 않는다.
@@ -696,6 +697,7 @@ export function PaperBlock({
 
     syncEmpty()
     setPickedAt(null)
+    scheduleSave()
     /*
      * 일부 브라우저는 입력이 끝난 시점에 커서 위치를 아직 갱신하지 않는다.
      * 그대로 읽으면 "커서 앞에 아무것도 없다"고 나와 `/` 를 쳐도 안 열렸다.
@@ -745,6 +747,7 @@ export function PaperBlock({
 
     syncEmpty()
     scheduleMeasure()
+    save()
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -795,6 +798,23 @@ export function PaperBlock({
     hidden.form?.requestSubmit()
   }
 
+  /** 잠시 멈추면 저장한다. 포커스를 잃을 때까지 기다리면 마지막 문장이 사라질 수 있다. */
+  function scheduleSave() {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(save, 800)
+  }
+
+  useEffect(() => {
+    // 실패한 값은 다음 입력·포커스 이탈에서 다시 보낼 수 있게 한다.
+    if (state.error) saved.current = null
+  }, [state])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
+  }, [])
+
   const rowHeight = lineHeight ?? 28
   const showMobileBar = narrow && focused
   // 폰에서는 칸을 누르면 이미 막대가 떠 있다. 두 개가 겹치면 어지럽다.
@@ -834,6 +854,7 @@ export function PaperBlock({
           onClick={handleClick}
           onFocus={() => setFocused(true)}
           onBlur={() => {
+            if (saveTimer.current) clearTimeout(saveTimer.current)
             setFocused(false)
             closeMenu()
             setPickedAt(null)
@@ -848,6 +869,8 @@ export function PaperBlock({
             const text = e.clipboardData.getData('text/plain')
             document.execCommand('insertText', false, text)
             syncEmpty()
+            scheduleMeasure()
+            scheduleSave()
           }}
           dangerouslySetInnerHTML={initialHtml}
           style={{
@@ -1036,8 +1059,16 @@ export function PaperBlock({
       {state.error && (
         <p role="alert" className="pt-1 text-[11px] text-danger">
           {state.error}
+          <button
+            type="button"
+            onClick={save}
+            className="ml-2 cursor-pointer underline underline-offset-2"
+          >
+            다시 시도
+          </button>
         </p>
       )}
+      {pending && <p className="pt-1 text-[11px] text-ink-faint">저장 중…</p>}
     </form>
   )
 }
