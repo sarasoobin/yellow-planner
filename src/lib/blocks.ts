@@ -10,6 +10,8 @@ import type { Item, ItemStyle } from '@/lib/types'
  * 그 칸을 한 번 저장하면 한 행으로 정리된다.
  */
 export type Block = {
+  /** 반복 규칙을 바꾸기 위한 원본 event 행 ID. 오래된 병합 데이터에는 없을 수 있다. */
+  id?: string
   content: string
   color: string | null
   style: ItemStyle | null
@@ -20,6 +22,7 @@ export const EMPTY_BLOCK: Block = { content: '', color: null, style: null }
 export function toBlock(rows: Item[]): Block {
   if (rows.length === 0) return EMPTY_BLOCK
   return {
+    id: rows[0].id,
     content: rows.map((row) => row.content).join('\n'),
     color: rows[0].color,
     style: rows[0].style,

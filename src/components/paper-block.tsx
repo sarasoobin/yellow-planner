@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState } from 'react'
+import { useActionState, useCallback, useEffect, useRef, useState } from 'react'
 import { saveBlock } from '@/lib/actions/items'
 import { PENS, useArmedSticker } from '@/components/toolbar'
 import { useIsNarrow } from '@/components/use-is-narrow'
@@ -83,7 +83,6 @@ type Option = {
 
 const SIZE_LABELS: { key: SizeKey; label: string }[] = [
   { key: 'sm', label: '작게' },
-  { key: 'md', label: '보통' },
   { key: 'lg', label: '크게' },
   { key: 'xl', label: '아주 크게' },
 ]
@@ -216,6 +215,233 @@ function highlightAt(): string | null {
   return HIGHLIGHT_COLORS.find((hex) => toRgb(hex) === painted) ?? null
 }
 
+type TextSlice = { node: Text; from: number; to: number }
+
+function selectedTextSlices(root: HTMLElement, range: Range): TextSlice[] {
+  const slices: TextSlice[] = []
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let node: Node | null
+  while ((node = walker.nextNode())) {
+    const text = node as Text
+    if (!text.data || !range.intersectsNode(text)) continue
+
+    const from = text === range.startContainer ? range.startOffset : 0
+    const to = text === range.endContainer ? range.endOffset : text.data.length
+    if (from < to) slices.push({ node: text, from, to })
+  }
+  return slices
+}
+
+function wrapTextSlice(
+  slice: TextSlice,
+  makeWrapper: () => HTMLElement,
+): HTMLElement | null {
+  const parent = slice.node.parentNode
+  if (!parent) return null
+
+  const before = slice.node.data.slice(0, slice.from)
+  const picked = slice.node.data.slice(slice.from, slice.to)
+  const after = slice.node.data.slice(slice.to)
+  if (!picked) return null
+
+  const fragment = document.createDocumentFragment()
+  if (before) fragment.append(document.createTextNode(before))
+
+  const wrapper = makeWrapper()
+  wrapper.append(document.createTextNode(picked))
+  fragment.append(wrapper)
+
+  if (after) fragment.append(document.createTextNode(after))
+  parent.replaceChild(fragment, slice.node)
+  return wrapper
+}
+
+/**
+ * execCommand 는 줄·태그 경계를 넘는 선택에서 자주 실패한다.
+ * 형광펜과 밑줄은 선택된 글자 노드를 직접 잘라 감싸 모든 칸에서 똑같이 먹게 한다.
+ */
+function decorateSelection(
+  root: HTMLElement,
+  makeWrapper: () => HTMLElement,
+): boolean {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return false
+
+  const range = selection.getRangeAt(0).cloneRange()
+  if (range.collapsed || !range.intersectsNode(root)) return false
+
+  const slices = selectedTextSlices(root, range)
+  if (slices.length === 0) return false
+
+  const wrappers = slices
+    .reverse()
+    .map((slice) => wrapTextSlice(slice, makeWrapper))
+    .filter((wrapper): wrapper is HTMLElement => wrapper !== null)
+
+  root.normalize()
+  selection.removeAllRanges()
+
+  if (wrappers.length > 0) {
+    const after = document.createRange()
+    after.setStartAfter(wrappers[0])
+    after.collapse(true)
+    selection.addRange(after)
+  }
+  return wrappers.length > 0
+}
+
+function closestDecoratedElement(
+  root: HTMLElement,
+  node: Text,
+  decorated: (element: HTMLElement) => boolean,
+): HTMLElement | null {
+  let element = node.parentElement
+  while (element && element !== root) {
+    if (decorated(element)) return element
+    element = element.parentElement
+  }
+  return null
+}
+
+function appendWrappedSlice(fragment: DocumentFragment, wrapper: HTMLElement, slice: DocumentFragment) {
+  if (!slice.childNodes.length) return
+  const clone = wrapper.cloneNode(false) as HTMLElement
+  clone.append(slice)
+  fragment.append(clone)
+}
+
+function unwrapDecoratedSlice(
+  wrapper: HTMLElement,
+  startNode: Text,
+  startOffset: number,
+  endNode: Text,
+  endOffset: number,
+) {
+  const parent = wrapper.parentNode
+  if (!parent) return
+
+  const beforeRange = document.createRange()
+  beforeRange.setStart(wrapper, 0)
+  beforeRange.setEnd(startNode, startOffset)
+
+  const pickedRange = document.createRange()
+  pickedRange.setStart(startNode, startOffset)
+  pickedRange.setEnd(endNode, endOffset)
+
+  const afterRange = document.createRange()
+  afterRange.setStart(endNode, endOffset)
+  afterRange.setEnd(wrapper, wrapper.childNodes.length)
+
+  const fragment = document.createDocumentFragment()
+  appendWrappedSlice(fragment, wrapper, beforeRange.cloneContents())
+  fragment.append(pickedRange.cloneContents())
+  appendWrappedSlice(fragment, wrapper, afterRange.cloneContents())
+  parent.replaceChild(fragment, wrapper)
+}
+
+function removeDecoration(
+  root: HTMLElement,
+  decorated: (element: HTMLElement) => boolean,
+): boolean {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return false
+
+  const range = selection.getRangeAt(0).cloneRange()
+  if (range.collapsed || !range.intersectsNode(root)) return false
+
+  const slices = selectedTextSlices(root, range)
+  const groups: { wrapper: HTMLElement; slices: TextSlice[] }[] = []
+  for (const slice of slices) {
+    const wrapper = closestDecoratedElement(root, slice.node, decorated)
+    if (!wrapper) return false
+    const group = groups.find((entry) => entry.wrapper === wrapper)
+    if (group) group.slices.push(slice)
+    else groups.push({ wrapper, slices: [slice] })
+  }
+  if (groups.length === 0) return false
+
+  for (const group of groups.reverse()) {
+    const first = group.slices[0]
+    const last = group.slices[group.slices.length - 1]
+    unwrapDecoratedSlice(group.wrapper, first.node, first.from, last.node, last.to)
+  }
+  root.normalize()
+  selection.removeAllRanges()
+  return true
+}
+
+function isHighlightedWith(hex: string) {
+  const rgb = toRgb(hex)
+  return (element: HTMLElement) =>
+    element.style.backgroundColor === hex ||
+    element.style.backgroundColor === rgb ||
+    getComputedStyle(element).backgroundColor === rgb
+}
+
+function isUnderlined(element: HTMLElement): boolean {
+  return element.tagName === 'U' ||
+    element.style.textDecoration === 'underline' ||
+    element.style.textDecorationLine === 'underline'
+}
+
+function textSlicesAroundSelection(root: HTMLElement): TextSlice[] {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return []
+  const range = selection.getRangeAt(0)
+  if (!root.contains(range.commonAncestorContainer)) return []
+  if (!range.collapsed) return selectedTextSlices(root, range)
+  const node = selection.anchorNode
+  if (node?.nodeType === Node.TEXT_NODE) return [{ node: node as Text, from: 0, to: 0 }]
+  return []
+}
+
+function everySelectedText(
+  root: HTMLElement,
+  decorated: (element: HTMLElement) => boolean,
+): boolean {
+  const slices = textSlicesAroundSelection(root)
+  return slices.length > 0 &&
+    slices.every((slice) => closestDecoratedElement(root, slice.node, decorated))
+}
+
+function fontWeightOn(element: HTMLElement): boolean {
+  const tag = element.tagName
+  const weight = Number.parseInt(getComputedStyle(element).fontWeight, 10)
+  return tag === 'B' || tag === 'STRONG' || element.style.fontWeight === 'bold' || weight >= 600
+}
+
+function italicOn(element: HTMLElement): boolean {
+  return element.tagName === 'I' ||
+    element.tagName === 'EM' ||
+    element.style.fontStyle === 'italic' ||
+    getComputedStyle(element).fontStyle === 'italic'
+}
+
+function colorOn(hex: string) {
+  const rgb = toRgb(hex)
+  return (element: HTMLElement) =>
+    element.style.color === hex ||
+    element.style.color === rgb ||
+    getComputedStyle(element).color === rgb
+}
+
+function fontSizeOn(px: number) {
+  return (element: HTMLElement) =>
+    element.style.fontSize === `${px}px` ||
+    getComputedStyle(element).fontSize === `${px}px`
+}
+
+function optionActive(option: Option, root: HTMLElement): boolean {
+  const command = option.command
+  if (command.kind === 'highlight') return everySelectedText(root, isHighlightedWith(command.hex))
+  if (command.kind === 'size') return everySelectedText(root, fontSizeOn(command.px))
+  if (command.kind === 'exec' && command.name === 'underline') return everySelectedText(root, isUnderlined)
+  if (command.kind === 'exec' && command.name === 'bold') return everySelectedText(root, fontWeightOn) || document.queryCommandState('bold')
+  if (command.kind === 'exec' && command.name === 'italic') return everySelectedText(root, italicOn) || document.queryCommandState('italic')
+  if (command.kind === 'exec' && command.name === 'foreColor' && command.value) return everySelectedText(root, colorOn(command.value))
+  return false
+}
+
 /**
  * 형광펜을 칠하거나 지운다.
  *
@@ -223,7 +449,23 @@ function highlightAt(): string | null {
  * 명령이다. 같은 색을 또 넣어봐야 그대로다. 그래서 칠해져 있는지 직접 보고,
  * 같은 색이면 투명으로 되돌려 지운다. 다른 색이면 그 색으로 바꾼다.
  */
-function toggleHighlight(hex: string) {
+function toggleHighlight(hex: string, root?: HTMLElement) {
+  const selection = window.getSelection()
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+  if (root && range && !range.collapsed) {
+    const slices = selectedTextSlices(root, range)
+    const highlighted = isHighlightedWith(hex)
+    if (slices.length > 0 && slices.every((slice) =>
+      closestDecoratedElement(root, slice.node, highlighted))) {
+      if (removeDecoration(root, highlighted)) return
+    }
+    if (decorateSelection(root, () => {
+      const span = document.createElement('span')
+      span.style.backgroundColor = hex
+      return span
+    })) return
+  }
+
   document.execCommand('styleWithCSS', false, 'true')
   document.execCommand(
     'hiliteColor',
@@ -239,7 +481,18 @@ function toggleHighlight(hex: string) {
  * 실제로 보이는 빨간 줄은 화면에 그린다 — 브라우저가 긋는 줄은 글자색을 따라가
  * 인쇄한 것처럼 보이기 때문이다. 브라우저 줄은 globals.css 에서 감춘다.
  */
-function toggleUnderline() {
+function toggleUnderline(root?: HTMLElement) {
+  const selection = window.getSelection()
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+  if (root && range && !range.collapsed) {
+    const slices = selectedTextSlices(root, range)
+    if (slices.length > 0 && slices.every((slice) =>
+      closestDecoratedElement(root, slice.node, isUnderlined))) {
+      if (removeDecoration(root, isUnderlined)) return
+    }
+    if (decorateSelection(root, () => document.createElement('u'))) return
+  }
+
   document.execCommand('styleWithCSS', false, 'true')
   document.execCommand('underline')
 }
@@ -369,6 +622,7 @@ export function PaperBlock({
   lineHeight,
   ruled = true,
   firstLineIndent,
+  firstLineBold = false,
   fontSize = 16,
   className = '',
 }: {
@@ -388,6 +642,8 @@ export function PaperBlock({
   ruled?: boolean
   /** 첫 줄만 들여쓴다 (달력 칸에서 날짜를 피하려고) */
   firstLineIndent?: number
+  /** 달력 첫 줄처럼 그 날의 중요 행사를 자동으로 굵게 보인다 */
+  firstLineBold?: boolean
   fontSize?: number
   className?: string
 }) {
@@ -441,6 +697,7 @@ export function PaperBlock({
   const [query, setQuery] = useState<string | null>(null)
   const [active, setActive] = useState(0)
   const [menuAt, setMenuAt] = useState({ top: 0, left: 0 })
+  const [activeOptions, setActiveOptions] = useState<Set<string>>(() => new Set())
 
   // 글자를 골랐을 때 뜨는 막대
   const [pickedAt, setPickedAt] = useState<{ top: number; left: number } | null>(
@@ -460,7 +717,12 @@ export function PaperBlock({
     slashRef.current = null
     setQuery(null)
     setActive(0)
+    setActiveOptions(new Set())
   }
+
+  const syncActiveOptions = useCallback((root: HTMLElement) => {
+    setActiveOptions(new Set(OPTIONS.filter((option) => optionActive(option, root)).map((option) => option.key)))
+  }, [])
 
   /** 커서 앞의 `/명령어` 를 살펴 메뉴를 열거나 닫는다 */
   function syncMenu() {
@@ -497,6 +759,7 @@ export function PaperBlock({
     slashRef.current = { node: text, from: slash, to: offset }
     setQuery(before.slice(slash + 1))
     setActive(0)
+    syncActiveOptions(root)
 
     // 커서만 있는 자리는 크기가 0인 사각형이 나오기도 한다. 그때는 그 줄을 기준으로.
     let rect = selection.getRangeAt(0).getBoundingClientRect()
@@ -550,7 +813,7 @@ export function PaperBlock({
   }
 
   /** 글자를 골랐는지 살펴 막대를 띄우거나 감춘다 */
-  function syncPicked() {
+  const syncPicked = useCallback(() => {
     const root = editorRef.current
     const selection = window.getSelection()
     if (!root || !selection || selection.rangeCount === 0) {
@@ -561,7 +824,12 @@ export function PaperBlock({
       return setPickedAt(null)
     }
     setPickedAt(positionBelow(range.getBoundingClientRect(), 300))
-  }
+    syncActiveOptions(root)
+  }, [syncActiveOptions])
+
+  const syncPickedSoon = useCallback(() => {
+    requestAnimationFrame(syncPicked)
+  }, [syncPicked])
 
   /**
    * 손을 뗐을 때. 도구를 집어들었으면 방금 긁은 만큼 칠하거나 줄을 긋는다.
@@ -582,10 +850,10 @@ export function PaperBlock({
       !range.collapsed &&
       root.contains(range.commonAncestorContainer)
 
-    if (!scribbled) return syncPicked()
+    if (!scribbled) return syncPickedSoon()
 
-    if (marker) toggleHighlight(marker)
-    else toggleUnderline()
+    if (marker) toggleHighlight(marker, root)
+    else toggleUnderline(root)
 
     // 긁은 자리가 그대로 남아 있으면 다음에 그은 데가 어디인지 헷갈린다
     selection!.removeAllRanges()
@@ -685,6 +953,22 @@ export function PaperBlock({
     // 이 칸은 처음 그린 내용을 붙들고 다시 안 받아온다. 한 번만 걸면 된다.
   }, [])
 
+  useEffect(() => {
+    const onSelection = () => {
+      const root = editorRef.current
+      const selection = window.getSelection()
+      const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+      if (!root || !range || range.collapsed || !root.contains(range.commonAncestorContainer)) return
+      syncPickedSoon()
+    }
+    document.addEventListener('selectionchange', onSelection)
+    document.addEventListener('mouseup', onSelection)
+    return () => {
+      document.removeEventListener('selectionchange', onSelection)
+      document.removeEventListener('mouseup', onSelection)
+    }
+  }, [syncPickedSoon])
+
   function handleInput() {
     scheduleMeasure()
 
@@ -709,6 +993,7 @@ export function PaperBlock({
     const root = editorRef.current
     if (!root) return
 
+    const wasActive = activeOptions.has(option.key) || optionActive(option, root)
     const slash = slashRef.current
     if (slash) {
       /*
@@ -728,8 +1013,6 @@ export function PaperBlock({
         // 그 사이 글이 바뀌어 자리를 못 찾은 경우. 명령은 그대로 진행한다.
       }
     }
-    closeMenu()
-    setPickedAt(null)
 
     // 서식을 태그가 아니라 style 로 남긴다. 저장할 때 걸러내기 쉽다.
     document.execCommand('styleWithCSS', false, 'true')
@@ -737,14 +1020,24 @@ export function PaperBlock({
     const command = option.command
     if (command.kind === 'insert') {
       document.execCommand('insertText', false, command.text)
+    } else if (command.kind === 'exec' && command.name === 'underline') {
+      toggleUnderline(root)
+    } else if (command.kind === 'exec' && command.name === 'foreColor' && command.value) {
+      if (wasActive && removeDecoration(root, colorOn(command.value))) {
+        // 같은 펜 색을 다시 누르면 선택한 글자에서 그 색만 내려놓는다.
+      } else document.execCommand(command.name, false, command.value)
     } else if (command.kind === 'exec') {
       document.execCommand(command.name, false, command.value)
     } else if (command.kind === 'highlight') {
-      toggleHighlight(command.hex)
+      toggleHighlight(command.hex, root)
     } else {
-      wrapFontSize(command.px)
+      if (wasActive && removeDecoration(root, fontSizeOn(command.px))) {
+        // 같은 글자 크기를 다시 누르면 선택한 글자에서 크기 표시를 벗긴다.
+      } else wrapFontSize(command.px)
     }
 
+    closeMenu()
+    setPickedAt(null)
     syncEmpty()
     scheduleMeasure()
     save()
@@ -817,9 +1110,7 @@ export function PaperBlock({
 
   const rowHeight = lineHeight ?? 28
   const showMobileBar = narrow && focused
-  // 폰에서는 칸을 누르면 이미 막대가 떠 있다. 두 개가 겹치면 어지럽다.
-  // 형광펜을 든 동안에도 띄우지 않는다. 긁는 족족 칠해지므로 고를 일이 없다.
-  const showPickedBar = pickedAt !== null && !narrow && !marker
+  const pickedOpen = pickedAt !== null && !narrow && !marker && !underline
 
   return (
     <form action={formAction} className={`relative flex flex-col ${className}`}>
@@ -849,9 +1140,9 @@ export function PaperBlock({
           spellCheck={false}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
-          onKeyUp={syncPicked}
+          onKeyUp={syncPickedSoon}
           onMouseUp={handleMouseUp}
-          onClick={handleClick}
+          onClick={() => { handleClick(); syncPickedSoon() }}
           onFocus={() => setFocused(true)}
           onBlur={() => {
             if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -881,7 +1172,9 @@ export function PaperBlock({
             fontSize: `${fontSize}px`,
             backgroundImage: ruled ? ruledGradient(rowHeight) : undefined,
           }}
-          className="w-full flex-1 break-words whitespace-pre-wrap outline-none"
+          className={`w-full flex-1 break-words whitespace-pre-wrap outline-none ${
+            firstLineBold ? 'first-line:font-bold' : ''
+          }`}
         />
 
         {/*
@@ -968,29 +1261,43 @@ export function PaperBlock({
         )}
       </div>
 
-      {/* 글자를 고르면 뜨는 막대 — 고른 부분만 바뀐다 */}
-      {showPickedBar && (
-        <div
-          role="toolbar"
+      {/* 글자를 고르면 슬래시 메뉴와 같은 선택지로 꾸민다 */}
+      {pickedOpen && (
+        <ul
+          role="listbox"
           aria-label="고른 글자 꾸미기"
           style={{ top: `${pickedAt.top}px`, left: `${pickedAt.left}px` }}
-          className="fixed z-50 flex items-center gap-0.5 border border-rule bg-paper px-1 py-1 shadow-notebook"
+          className="fixed z-50 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook"
         >
-          {STYLE_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              aria-label={option.label}
-              title={option.label}
-              // 누르는 순간 고른 글자가 풀리면 안 된다
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => run(option)}
-              className="grid size-7 cursor-pointer place-items-center rounded-[2px] text-ink-soft hover:bg-frame/70"
-            >
-              {option.icon}
-            </button>
-          ))}
-        </div>
+          {STYLE_OPTIONS.map((option, i) => {
+            const on = activeOptions.has(option.key)
+            return (
+              <li key={option.key}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={on}
+                  title={on ? `${option.label} 해제` : option.label}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => run(option)}
+                  onMouseEnter={() => setActive(i)}
+                  className={`flex w-full cursor-pointer items-center gap-2 border-l-4 px-2.5 py-1.5 text-left text-[13px] ${
+                    on
+                      ? 'border-accent bg-frame/75 font-semibold text-ink'
+                      : i === active
+                        ? 'border-transparent bg-frame/35 text-ink'
+                        : 'border-transparent text-ink-soft'
+                  }`}
+                >
+                  <span className="grid size-4 shrink-0 place-items-center">
+                    {option.icon}
+                  </span>
+                  {option.label}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       )}
 
       {/* 폰 — 화면 맨 위 꾸미기 줄. 키보드가 올라와도 가리지 않는다 */}
@@ -1033,26 +1340,34 @@ export function PaperBlock({
           style={{ top: `${menuAt.top}px`, left: `${menuAt.left}px` }}
           className="fixed z-50 max-h-56 w-44 overflow-y-auto border border-rule bg-paper py-1 shadow-notebook"
         >
-          {matches.map((option, i) => (
-            <li key={option.key}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={i === active}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => run(option)}
-                onMouseEnter={() => setActive(i)}
-                className={`flex w-full cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left text-[13px] ${
-                  i === active ? 'bg-frame/60 text-ink' : 'text-ink-soft'
-                }`}
-              >
-                <span className="grid size-4 shrink-0 place-items-center">
-                  {option.icon}
-                </span>
-                {option.label}
-              </button>
-            </li>
-          ))}
+          {matches.map((option, i) => {
+            const on = activeOptions.has(option.key)
+            return (
+              <li key={option.key}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={on || i === active}
+                  title={on ? `${option.label} 해제` : option.label}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => run(option)}
+                  onMouseEnter={() => setActive(i)}
+                  className={`flex w-full cursor-pointer items-center gap-2 border-l-4 px-2.5 py-1.5 text-left text-[13px] ${
+                    on
+                      ? 'border-accent bg-frame/75 font-semibold text-ink'
+                      : i === active
+                        ? 'border-transparent bg-frame/35 text-ink'
+                        : 'border-transparent text-ink-soft'
+                  }`}
+                >
+                  <span className="grid size-4 shrink-0 place-items-center">
+                    {option.icon}
+                  </span>
+                  {option.label}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
 

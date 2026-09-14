@@ -25,6 +25,16 @@ export const SIZES = {
 } as const
 export type SizeKey = keyof typeof SIZES
 
+/** 일정이 처음 적힌 날짜를 기준으로 되풀이되는 방식. */
+export const REPEAT_FREQUENCIES = [
+  'none',
+  'daily',
+  'weekly',
+  'monthly',
+  'yearly',
+] as const
+export type RepeatFrequency = (typeof REPEAT_FREQUENCIES)[number]
+
 /**
  * 한 칸을 어떤 펜으로 적었는지.
  *
@@ -45,6 +55,10 @@ export type ItemStyle = {
    * 사진을 붙이고 모서리를 끌어 키우듯 스티커도 끌어서 키운다.
    */
   scale?: number
+  /** event에만 쓰는 반복 일정 규칙. style JSON에 넣어 기존 DB와 호환한다. */
+  repeat?: RepeatFrequency
+  /** 월간 달력의 제목과 개별 체크 항목. 기존 style JSON을 사용한다. */
+  calendar?: import('@/lib/calendar-reminders').CalendarNote
 }
 
 /** 스티커 기본 크기(px)와 늘릴 수 있는 범위 */

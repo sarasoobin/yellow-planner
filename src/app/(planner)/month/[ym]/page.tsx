@@ -5,7 +5,6 @@ import { PaperBlock } from '@/components/paper-block'
 import { StickerLayer } from '@/components/sticker-layer'
 import { TallyMark } from '@/components/tally-mark'
 import {
-  EMPTY_BLOCK,
   blocksByDate,
   countChecked,
   countLines,
@@ -19,6 +18,7 @@ import {
   parseYearMonth,
   todayISO,
 } from '@/lib/dates'
+import { loadCalendarSources } from '@/lib/supabase/calendar'
 import type { Item } from '@/lib/types'
 
 type Params = { params: Promise<{ ym: string }> }
@@ -45,11 +45,12 @@ export default async function MonthPage({ params }: Params) {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const [{ data: calendarData }, { data: asideData }] = await Promise.all([
+  const [sources, { data: taskData }, { data: asideData }] = await Promise.all([
+    loadCalendarSources(supabase, rangeEnd),
     supabase
       .from('items')
       .select('*')
-      .in('kind', ['event', 'task'])
+      .eq('kind', 'task')
       .gte('date', rangeStart)
       .lte('date', rangeEnd)
       .order('sort_order', { ascending: true })
@@ -63,9 +64,8 @@ export default async function MonthPage({ params }: Params) {
       .order('created_at', { ascending: true }),
   ])
 
-  const calendarItems = (calendarData ?? []) as Item[]
-  const events = blocksByDate(calendarItems.filter((i) => i.kind === 'event'))
-  const tasks = blocksByDate(calendarItems.filter((i) => i.kind === 'task'))
+  const taskItems = (taskData ?? []) as Item[]
+  const tasks = blocksByDate(taskItems)
 
   const asideItems = (asideData ?? []) as Item[]
   const memo = toBlock(asideItems.filter((i) => i.kind === 'month'))
@@ -77,7 +77,6 @@ export default async function MonthPage({ params }: Params) {
   const weeks: CalendarDay[][] = grid.map((week) =>
     week.map((date) => ({
       date,
-      block: events.get(date) ?? EMPTY_BLOCK,
       taskCount: countLines(tasks.get(date)?.content ?? ''),
       isToday: date === today,
       inMonth: isInMonth(date, ym),
@@ -101,7 +100,7 @@ export default async function MonthPage({ params }: Params) {
         두세 글자마다 줄이 바뀌어 읽을 수가 없었다. 화면이 넓으면 더 넓게 준다.
       */}
       <aside className="order-2 flex shrink-0 flex-col border-t border-rule bg-frame/30 px-3 py-4 md:order-1 md:w-56 md:border-t-0 md:border-r xl:w-72">
-        <h1 className="font-hand mb-2 text-4xl leading-none text-ink">
+        <h1 className="font-sans mb-2 text-4xl leading-none font-bold text-ink">
           {monthLabel(ym)}
         </h1>
 
@@ -126,14 +125,9 @@ export default async function MonthPage({ params }: Params) {
 
       {/* 오른쪽 — 달력 */}
       <div className="order-1 flex min-w-0 flex-1 flex-col px-3 py-4 md:order-2 md:px-4">
-        <MonthBoard weeks={weeks} ym={ym} path={path} today={today} />
+        <MonthBoard key={ym} weeks={weeks} ym={ym} today={today} sources={sources} />
 
-        {/* 안내는 화면에 따라 다르다. 폰에서는 칸에 직접 적을 수 없다 */}
-        <p className="mt-2 hidden text-[12px] text-ink-faint md:block">
-          날짜 옆부터 바로 적으면 됩니다. 길어지면 다음 줄로 이어지고, 왼쪽{' '}
-          <span className="text-accent">›</span> 나 날짜를 누르면 그 주의 주간
-          페이지로 갑니다.
-        </p>
+        {/* 폰에서는 칸에 직접 적을 수 없어 별도 안내를 보인다. */}
         <p className="mt-2 text-[12px] text-ink-faint md:hidden">
           날짜를 누르면 아래에서 그 날을 적습니다. 왼쪽{' '}
           <span className="text-accent">›</span> 는 그 주의 주간 페이지로 갑니다.

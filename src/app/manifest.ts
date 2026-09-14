@@ -18,9 +18,9 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     display: 'standalone',
     // 노트 바깥 책상색 (--color-desk). 앱이 뜨는 동안 잠깐 보이는 바탕
-    background_color: '#f4f2ed',
+    background_color: '#f7f1f7',
     // 표지색 (--color-frame). 주소창·상태바가 이 색으로 물든다
-    theme_color: '#FFF099',
+    theme_color: '#edc3e8',
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

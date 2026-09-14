@@ -1,60 +1,49 @@
 @import "tailwindcss";
 
+/* 나눔바른펜 — 글을 쓰는 플래너에 맞는 단정한 손글씨체 */
+@font-face {
+  font-family: "NanumBarunpen";
+  src: url("https://cdn.jsdelivr.net/gh/wefonts/nanumBarunPen/nanumBarunPen-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+
 /* ═══════════════════════════════════════════════════════════════
  *  🎨 색은 전부 여기서 고칩니다. 저장하면 앱 전체에 바로 반영됩니다.
  *
- *  ── 노란색 후보 ──────────────────────────────────────────────
- *  왼쪽이 표지색(--color-frame), 오른쪽이 짝이 되는 테두리색(--color-edge).
- *  둘을 같이 바꿔야 자연스럽습니다.
- *
- *    #FFF0A5 / #EBD97A   레몬크림     ← 지금 이 색. 연하고 은은함
- *    #FFEFC2 / #E9D8A6   연한 크림    거의 흰 종이에 가까움
- *    #FDE68A / #EDC85C   버터         따뜻하고 부드러움
- *    #FCE788 / #E7CE5E   파스텔       채도 낮은 노랑
- *    #FFE066 / #E8C43C   병아리       밝고 귀여움
- *    #FFDF6B / #E5C244   개나리       선명함
- *    #FFD84D / #DDB52E   진한 노랑    제일 쨍함
- *    #F5D76E / #DCBB4E   골드         살짝 고급스러움
- *    #F7DE8B / #E0C368   살구노랑     주황빛이 도는 노랑
- *    #F2E3A8 / #DCCB80   미색         종이에 가까운 노랑
- *    #EFD98A / #D8C070   모래         차분함
- *    #F0E3A0 / #E0CE72   머스터드     처음 쓰던 색 (칙칙함)
+ *  ── 핑크빛 보라 테마 ─────────────────────────────────────────
+ *  표지는 연한 라일락 핑크, 테두리와 강조색은 한 톤 진한 플럼으로 맞춥니다.
  *
  *  ── 다른 색도 바꿀 수 있습니다 ────────────────────────────────
- *    --color-paper  종이색. 노란기를 빼려면 #FFFFFF 에 가깝게
+ *    --color-paper  종이색. 색감을 빼려면 #FFFFFF 에 가깝게
  *    --color-rule   줄 색. 줄이 너무 진하면 연하게
  *    --color-desk   노트 바깥 배경
  * ═══════════════════════════════════════════════════════════════ */
 @theme {
   /* 노트 */
-  --color-frame: #FFF099; /* 노트 표지 — 표지 페이지 전체, 프레임, 헤더 */
-  --color-edge: #ebd97a; /* 프레임 테두리 — frame보다 한 톤 진하게 */
-  --color-paper: #fffdf4; /* 종이 — 달력·주간칸이 올라가는 면 */
-  --color-desk: #f4f2ed; /* 책상 — 노트 바깥 배경 */
-  --color-rule: #e4dac0; /* 괘선·칸 구분선 */
+  --color-frame: #edc3e8; /* 노트 표지 — 연한 라일락 핑크 */
+  --color-edge: #d998d0; /* 프레임 테두리 — frame보다 한 톤 진하게 */
+  --color-paper: #fffbff; /* 종이 — 달력·주간칸이 올라가는 면 */
+  --color-desk: #f7f1f7; /* 책상 — 노트 바깥 배경 */
+  --color-rule: #e7d7e6; /* 괘선·칸 구분선 */
 
   /* 글자 */
-  --color-ink: #3a3226; /* 제목 */
-  --color-ink-soft: #5a5145; /* 본문 */
-  --color-ink-faint: #9a9080; /* 보조·날짜 */
+  --color-ink: #413342; /* 제목 */
+  --color-ink-soft: #604f61; /* 본문 */
+  --color-ink-faint: #9c8c9d; /* 보조·날짜 */
 
   /* 강조 */
-  --color-accent: #8b6f3d; /* 버튼·활성 (노란 배경 위에서도 보이는 갈색) */
-  --color-today: #c1453c; /* 오늘 (빨간펜) */
+  --color-accent: #914d8b; /* 버튼·활성 */
+  --color-today: #c14d7a; /* 오늘 (핑크 펜) */
   --color-done: #6b8e5a; /* 완료 체크 */
   --color-danger: #b23b32; /* 삭제·위험 */
 
-  /* Geist에는 한글이 없어 뒤의 한글 폰트로 자연스럽게 넘어간다.
-     손글씨 폰트는 Day 3에 제목·로고에만 적용한다 (DESIGN.md §3). */
+  /* 나눔바른펜을 우선 쓰고, 불러오는 동안에는 고풍스러운 명조체로 이어진다. */
   --font-sans:
-    var(--font-geist-sans), "Pretendard Variable", Pretendard, -apple-system,
-    BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", system-ui,
-    sans-serif;
+    "NanumBarunpen", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Noto Serif KR",
+    "Nanum Myeongjo", "AppleMyungjo", "Batang", Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* 손글씨 — 제목·로고·연도에만 (DESIGN.md §3).
-     본문까지 손글씨로 하면 여러 줄 적었을 때 못 읽는다. */
-  --font-hand: var(--font-hand-src), var(--font-sans);
+  --font-hand: "NanumBarunpen", "Iowan Old Style", "AppleMyungjo", "Batang", Georgia, serif;
 
   /* 공책 한 줄의 높이. 체크리스트와 괘선 메모가 모두 이 값을 쓴다. */
   --spacing-line: 28px;
@@ -68,8 +57,8 @@ body {
 /* 노트가 책상 위에 놓인 느낌. 그림자는 아주 옅게만 (DESIGN.md §4) */
 @utility shadow-notebook {
   box-shadow:
-    0 1px 2px rgba(58, 50, 38, 0.08),
-    0 10px 30px rgba(58, 50, 38, 0.07);
+    0 1px 2px rgba(65, 51, 66, 0.08),
+    0 10px 30px rgba(65, 51, 66, 0.07);
 }
 
 /*
@@ -96,6 +85,13 @@ body {
 [role='textbox'] u,
 [role='textbox'] [style*='underline'] {
   text-decoration-color: transparent;
+}
+
+.calendar-rich-text u,
+.calendar-rich-text [style*='underline'] {
+  text-decoration-color: var(--color-today);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 @utility ruled {

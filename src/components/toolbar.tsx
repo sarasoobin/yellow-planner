@@ -21,14 +21,14 @@ import { HIGHLIGHTS, STICKERS, UNDERLINE_COLOR } from '@/lib/stickers'
  * 저장 직전 sanitize.ts 가 #hex 와 rgb() 만 통과시키므로 var(--color-ink) 를
  * 넣으면 저장되는 순간 색이 통째로 날아간다.
  *
- * 검정은 --color-ink, 빨강은 --color-today 와 같은 값이다.
+ * 검정은 --color-ink, 로즈는 --color-today 와 같은 값이다.
  * globals.css 에서 그 둘을 바꾸면 여기도 같이 바꿔야 한다.
- * 파랑은 짝이 되는 토큰이 없다 (펜에만 쓰는 색).
+ * 보라는 펜에만 쓰는 색이다.
  */
 export const PENS = [
-  { key: 'black', label: '검정', hex: '#3A3226' },
-  { key: 'red', label: '빨강', hex: '#C1453C' },
-  { key: 'blue', label: '파랑', hex: '#33618F' },
+  { key: 'black', label: '먹색', hex: '#413342' },
+  { key: 'rose', label: '로즈', hex: '#C14D7A' },
+  { key: 'purple', label: '보라', hex: '#6956A6' },
 ] as const
 
 type ArmedState = {
@@ -93,7 +93,7 @@ export function ToolProvider({ children }: { children: React.ReactNode }) {
 function toolClass(on: boolean): string {
   return `grid size-7 shrink-0 cursor-pointer place-items-center rounded-[3px] border transition-all ${
     on
-      ? 'scale-110 border-accent bg-paper shadow-[0_1px_3px_rgba(58,50,38,.25)]'
+      ? 'scale-110 border-accent bg-paper shadow-[0_1px_3px_rgba(65,51,66,.25)]'
       : 'border-transparent opacity-55 hover:opacity-100'
   }`
 }
@@ -130,7 +130,7 @@ export function Toolbar() {
             onClick={() => setMarker(on ? null : pen.hex)}
             className={toolClass(on)}
           >
-            {/* 표지가 노란색이라 노랑 형광펜은 테두리가 없으면 배경에 묻힌다 */}
+            {/* 연한 형광펜도 도구 막대에서 또렷하게 보이도록 테두리를 둔다 */}
             <span
               aria-hidden
               className="block h-[9px] w-[15px] rounded-[1px] ring-1 ring-ink/20"

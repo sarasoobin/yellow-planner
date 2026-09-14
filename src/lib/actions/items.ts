@@ -6,11 +6,14 @@ import { createClient } from '@/lib/supabase/server'
 import { isBlank } from '@/lib/rich-text'
 import { sanitizeRich } from '@/lib/sanitize'
 import { STICKERS } from '@/lib/stickers'
+import { calendarNoteSchema } from '@/lib/calendar-reminders'
 import {
   STICKER_SCALE,
   type FormState,
   type ItemStyle,
+  type RepeatFrequency,
 } from '@/lib/types'
+import { isRepeatFrequency } from '@/lib/repetition'
 
 /**
  * 노트에 적은 것.
@@ -40,12 +43,15 @@ const STICKER_KEYS = STICKERS.map((sticker) => sticker.key) as [
   ...(typeof STICKERS)[number]['key'][],
 ]
 const ID = z.uuid('항목을 찾지 못했습니다.')
+const REPEAT = z.enum(['none', 'daily', 'weekly', 'monthly', 'yearly'])
 
 const STYLE = z.object({
   bold: z.boolean().optional(),
   italic: z.boolean().optional(),
   highlight: z.boolean().optional(),
   size: z.enum(['sm', 'md', 'lg', 'xl']).optional(),
+  repeat: REPEAT.optional(),
+  calendar: calendarNoteSchema.optional(),
   x: z.number().min(0).max(100).optional(),
   y: z.number().min(0).max(100).optional(),
   scale: z
@@ -88,9 +94,7 @@ function dbError(error: { code?: string } | null, fallback: string): string {
 }
 
 /** 화면을 새로 그릴 경로. 액션마다 어디서 불렸는지 달라서 폼에서 함께 넘긴다. */
-function revalidateFrom(formData: FormData) {
-  const raw = formData.get('path')
-  const path = typeof raw === 'string' ? raw : ''
+function revalidatePathFor(path: string) {
   const allowed =
     path === '/cover' ||
     path === '/note' ||
@@ -99,6 +103,58 @@ function revalidateFrom(formData: FormData) {
 
   // 폼 값은 브라우저에서 바꿀 수 있다. 이 앱이 실제로 가진 장만 다시 그린다.
   revalidatePath(allowed ? path : '/cover')
+}
+
+function revalidateFrom(formData: FormData) {
+  const raw = formData.get('path')
+  revalidatePathFor(typeof raw === 'string' ? raw : '')
+}
+
+/**
+ * 반복은 event의 style JSON에만 보관한다. 별도 컬럼을 만들지 않아도 기존 일정과
+ * DB가 그대로 호환되고, 선택한 원본 일정 하나만 바꿀 수 있다.
+ */
+export async function setEventRepeat(input: {
+  id: string
+  repeat: RepeatFrequency
+  path: string
+}): Promise<FormState> {
+  const id = ID.safeParse(input.id)
+  const repeat = REPEAT.safeParse(input.repeat)
+  if (!id.success || !repeat.success || !isRepeatFrequency(input.repeat)) {
+    return { error: '반복 설정을 확인하지 못했습니다.' }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: '로그인이 필요합니다.' }
+
+  const { data: item, error: readError } = await supabase
+    .from('items')
+    .select('style')
+    .eq('id', id.data)
+    .eq('kind', 'event')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (readError || !item) return { error: '일정을 찾지 못했습니다.' }
+
+  const previous =
+    item.style && typeof item.style === 'object' && !Array.isArray(item.style)
+      ? item.style
+      : {}
+  const nextStyle = { ...previous, repeat: repeat.data }
+  const { error } = await supabase
+    .from('items')
+    .update({ style: nextStyle })
+    .eq('id', id.data)
+    .eq('kind', 'event')
+    .eq('user_id', user.id)
+
+  if (error) return { error: dbError(error, '반복 일정을 저장하지 못했습니다.') }
+  revalidatePathFor(input.path)
+  return { error: null }
 }
 
 /**

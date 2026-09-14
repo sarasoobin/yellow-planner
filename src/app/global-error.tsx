@@ -7,8 +7,8 @@
  * globals.css 가 실리지 않아 Tailwind 클래스도, --color-* 토큰도 여기선 없다.
  * 그래서 색을 값으로 직접 적는다. globals.css 의 다음 토큰과 같은 값이다.
  *
- *   #f4f2ed  --color-desk   #fffdf4  --color-paper
- *   #5a5145  --color-ink-soft   #8b6f3d  --color-accent
+ *   #f7f1f7  --color-desk   #fffbff  --color-paper
+ *   #604f61  --color-ink-soft   #914d8b  --color-accent
  *
  * 표지색을 바꿀 때 같이 봐야 하는 세 곳 중 하나다 (DESIGN.md §2).
  * 나머지는 manifest.ts 와 layout.tsx 의 themeColor.
@@ -36,8 +36,8 @@ export default function GlobalError({
           gap: '16px',
           padding: '24px',
           textAlign: 'center',
-          background: '#f4f2ed',
-          color: '#5a5145',
+          background: '#f7f1f7',
+          color: '#604f61',
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif',
         }}
@@ -45,7 +45,7 @@ export default function GlobalError({
         {/* 여기서는 metadata 를 못 쓴다. 제목은 React 로 직접 넣는다 */}
         <title>正 PLANNER</title>
 
-        <p style={{ margin: 0, fontSize: '40px', color: '#8b6f3d' }}>正</p>
+        <p style={{ margin: 0, fontSize: '40px', color: '#914d8b' }}>正</p>
 
         <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.7 }}>
           앱을 여는 데 실패했습니다.
@@ -59,9 +59,9 @@ export default function GlobalError({
           style={{
             marginTop: '8px',
             cursor: 'pointer',
-            border: '1px solid #8b6f3d',
-            background: '#fffdf4',
-            color: '#8b6f3d',
+            border: '1px solid #914d8b',
+            background: '#fffbff',
+            color: '#914d8b',
             padding: '10px 18px',
             fontSize: '14px',
             fontWeight: 600,
@@ -72,7 +72,7 @@ export default function GlobalError({
         </button>
 
         {error.digest && (
-          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#5a5145' }}>
+          <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#604f61' }}>
             오류 표식 {error.digest}
           </p>
         )}

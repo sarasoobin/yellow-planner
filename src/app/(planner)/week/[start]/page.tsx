@@ -1,15 +1,19 @@
 import Link from 'next/link'
+import { addDays } from 'date-fns'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { NoteEditor } from '@/components/note-editor'
 import { PaperBlock } from '@/components/paper-block'
 import { StickerLayer } from '@/components/sticker-layer'
-import { EMPTY_BLOCK, blocksByDate, countLines, firstLine } from '@/lib/blocks'
+import { EMPTY_BLOCK, blocksByDate, countLines } from '@/lib/blocks'
+import { calendarTitles } from '@/lib/calendar-reminders'
+import { loadCalendarSources } from '@/lib/supabase/calendar'
 import {
   dayNumber,
   fromISODate,
   parseYearMonth,
   todayISO,
+  toISODate,
   weekDays,
   weekOwnerMonth,
   weekRangeLabel,
@@ -53,6 +57,10 @@ export default async function WeekPage({ params, searchParams }: Params) {
   const days = weekDays(monday)
   const today = todayISO()
   const ym = cameFrom ?? weekOwnerMonth(monday)
+  const prevWeek = toISODate(addDays(fromISODate(monday)!, -7))
+  const nextWeek = toISODate(addDays(fromISODate(monday)!, 7))
+  const prevQuery = `?from=${cameFrom ?? weekOwnerMonth(prevWeek)}`
+  const nextQuery = `?from=${cameFrom ?? weekOwnerMonth(nextWeek)}`
   // 저장 뒤 화면을 새로 그릴 경로. 쿼리를 붙이면 revalidatePath 가 못 알아본다
   const path = `/week/${monday}`
 
@@ -62,11 +70,12 @@ export default async function WeekPage({ params, searchParams }: Params) {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const [{ data: itemData }, { data: noteData }] = await Promise.all([
+  const [sources, { data: itemData }, { data: noteData }] = await Promise.all([
+    loadCalendarSources(supabase, days[6]),
     supabase
       .from('items')
       .select('*')
-      .in('kind', ['event', 'task', 'daily', 'sticker'])
+      .in('kind', ['task', 'daily', 'sticker'])
       .gte('date', days[0])
       .lte('date', days[6])
       .order('sort_order', { ascending: true })
@@ -84,7 +93,6 @@ export default async function WeekPage({ params, searchParams }: Params) {
   // 스티커는 주 시작일에 붙는다. 페이지 하나에 한 묶음이다.
   const stickers = items.filter((i) => i.kind === 'sticker' && i.date === monday)
 
-  const events = blocksByDate(items.filter((i) => i.kind === 'event'))
   const tasks = blocksByDate(items.filter((i) => i.kind === 'task'))
   const dailies = blocksByDate(items.filter((i) => i.kind === 'daily'))
 
@@ -108,12 +116,17 @@ export default async function WeekPage({ params, searchParams }: Params) {
         <h1 className="font-hand text-2xl leading-none text-ink">
           {weekRangeLabel(monday)}
         </h1>
-        <Link
-          href={`/month/${ym}`}
-          className="shrink-0 text-xs text-ink-faint underline underline-offset-4 hover:text-accent"
-        >
-          달력으로
-        </Link>
+        <nav aria-label="주간 이동" className="flex shrink-0 items-center gap-2 text-xs text-ink-faint">
+          <Link href={`/week/${prevWeek}${prevQuery}`} className="grid size-7 place-items-center rounded-full hover:bg-frame/60 hover:text-accent" aria-label="이전 주">
+            ‹
+          </Link>
+          <Link href={`/month/${ym}`} className="underline underline-offset-4 hover:text-accent">
+            달력으로
+          </Link>
+          <Link href={`/week/${nextWeek}${nextQuery}`} className="grid size-7 place-items-center rounded-full hover:bg-frame/60 hover:text-accent" aria-label="다음 주">
+            ›
+          </Link>
+        </nav>
       </header>
 
       {/*
@@ -127,7 +140,7 @@ export default async function WeekPage({ params, searchParams }: Params) {
             const daily = dailies.get(date) ?? EMPTY_BLOCK
             const task = tasks.get(date) ?? EMPTY_BLOCK
             // 달력에 적은 그 날 가장 중요한 일정 — 여기선 보여주기만 한다
-            const headline = firstLine(events.get(date)?.content ?? '')
+            const headline = calendarTitles(sources, date).join(' · ')
 
             return (
               <section
@@ -175,7 +188,7 @@ export default async function WeekPage({ params, searchParams }: Params) {
                         className="h-3 w-[3px] shrink-0"
                         style={{
                           backgroundColor:
-                            events.get(date)?.color ?? 'var(--color-today)',
+                            sources.find((source) => source.date === date)?.color ?? 'var(--color-today)',
                         }}
                       />
                       <span className="truncate" title={headline}>

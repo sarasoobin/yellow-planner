@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { startTransition, useState } from 'react'
 import { CalendarCell } from '@/components/calendar-cell'
-import { PaperBlock } from '@/components/paper-block'
+import { CalendarDayEditor, type CalendarTitleRename } from '@/components/calendar-day-editor'
+import { CalendarRepeatDialog, type RepeatSelection } from '@/components/calendar-repeat-dialog'
+import { useCalendarNotes } from '@/components/use-calendar-notes'
 import { useIsNarrow } from '@/components/use-is-narrow'
-import type { Block } from '@/lib/blocks'
+import { calendarText, type CalendarSource } from '@/lib/calendar-reminders'
 import { WEEKDAY_LABELS, dayLabel, dayNumber } from '@/lib/dates'
 
 /**
@@ -17,7 +19,6 @@ import { WEEKDAY_LABELS, dayLabel, dayNumber } from '@/lib/dates'
  */
 export type CalendarDay = {
   date: string
-  block: Block
   taskCount: number
   isToday: boolean
   inMonth: boolean
@@ -26,16 +27,22 @@ export type CalendarDay = {
 export function MonthBoard({
   weeks,
   ym,
-  path,
   today,
+  sources,
 }: {
   weeks: CalendarDay[][]
   ym: string
-  path: string
   /** 오늘 날짜. 이 달에 오늘이 있으면 처음부터 그 날을 펴둔다 */
   today: string
+  sources: CalendarSource[]
 }) {
   const narrow = useIsNarrow()
+  const controller = useCalendarNotes(sources)
+  const [details, setDetails] = useState<RepeatSelection | null>(null)
+  const [rename, setRename] = useState<CalendarTitleRename | null>(null)
+  // 취소한 반복 일정 이름은 아직 서버/상태에 반영하지 않는다. contentEditable에만
+  // 남은 임시 글자를 원래 값으로 되돌리기 위해 편집기를 새로 만든다.
+  const [editorRevision, setEditorRevision] = useState(0)
   const [picked, setPicked] = useState<string | null>(() =>
     today.startsWith(ym) ? today : null,
   )
@@ -82,15 +89,16 @@ export function MonthBoard({
 
             {week.map((day) => (
               <CalendarCell
-                key={day.date}
+                key={`${day.date}-${editorRevision}`}
                 date={day.date}
                 weekStart={week[0].date}
                 ym={ym}
-                block={day.block}
                 taskCount={day.taskCount}
                 isToday={day.isToday}
                 inMonth={day.inMonth}
-                path={path}
+                controller={controller}
+                onDetails={setDetails}
+                onRenameTitle={setRename}
                 narrow={narrow}
                 picked={day.date === picked}
                 onPick={setPicked}
@@ -116,22 +124,14 @@ export function MonthBoard({
                 </Link>
               </div>
 
-              {/*
-                날을 바꾸면 다른 칸이므로 key 로 새로 만든다.
-                이 편집기는 처음 열릴 때의 내용을 붙들고 다시 안 받아오기
-                때문이다 (paper-block.tsx 주석). key 가 없으면 날짜만 바뀌고
-                내용은 앞의 날 것이 그대로 남는다.
-              */}
-              <PaperBlock
-                key={pickedDay.date}
-                kind="event"
+              <CalendarDayEditor
+                key={`${pickedDay.date}-${editorRevision}`}
                 date={pickedDay.date}
-                path={path}
-                content={pickedDay.block.content}
-                color={pickedDay.block.color}
-                style={pickedDay.block.style}
-                minRows={4}
-                placeholder="중요한 일정을 적어보세요"
+                controller={controller}
+                onDetails={setDetails}
+                onRenameTitle={setRename}
+                leading={<span className="grid size-6 shrink-0 place-items-center text-sm font-semibold">{dayNumber(pickedDay.date)}</span>}
+                mobile
               />
             </>
           ) : (
@@ -141,7 +141,83 @@ export function MonthBoard({
           )}
         </div>
       )}
+      <div aria-live="polite" className="mt-1 min-h-4 text-xs text-ink-faint">
+        {controller.status === 'pending' && '저장 중…'}
+        {controller.status === 'error' && <span role="alert" className="text-danger">{controller.error}{' '}
+          <button type="button" className="underline underline-offset-2" onClick={() => startTransition(async () => { await controller.flush() })}>다시 저장</button>
+        </span>}
+      </div>
+      {details && <CalendarRepeatDialog selection={details} onClose={() => setDetails(null)} onSave={async (repeat, endsAt, memo) => {
+        controller.change(details.sourceDate, details.id
+          ? { type: 'repeat', id: details.id, repeat, endsAt }
+          : { type: 'titleRepeat', repeat, endsAt })
+        controller.change(details.sourceDate, details.id
+          ? { type: 'memo', id: details.id, memo }
+          : { type: 'titleMemo', memo })
+        return controller.flush()
+      }} onDelete={async (scope) => {
+        if (details.id) {
+          controller.change(details.sourceDate, details.repeat !== 'none' && scope === 'one'
+            ? { type: 'skip', id: details.id, date: details.occurrenceDate, skip: true }
+            : { type: 'remove', id: details.id })
+        } else {
+          controller.change(details.sourceDate, details.repeat !== 'none' && scope === 'one'
+            ? { type: 'titleSkip', date: details.occurrenceDate, skip: true }
+            : { type: 'titleRemove' })
+        }
+        return controller.flush()
+      }} />}
+      {rename && <TitleRenameDialog rename={rename} onClose={() => {
+        setRename(null)
+        setEditorRevision((revision) => revision + 1)
+      }} onPick={async (scope) => {
+        if (scope === 'one') {
+          controller.change(rename.sourceDate, { type: 'titleOverride', date: rename.occurrenceDate, text: rename.next })
+        } else {
+          controller.change(rename.sourceDate, { type: 'title', text: rename.next })
+          controller.change(rename.sourceDate, { type: 'titleOverride', date: rename.occurrenceDate, text: null })
+        }
+        const ok = await controller.flush()
+        if (ok) setRename(null)
+      }} />}
     </>
+  )
+}
+
+function TitleRenameDialog({ rename, onClose, onPick }: {
+  rename: CalendarTitleRename
+  onClose: () => void
+  onPick: (scope: 'one' | 'all') => Promise<void>
+}) {
+  const [saving, setSaving] = useState<'one' | 'all' | null>(null)
+  const previous = calendarText(rename.previous)
+  const next = calendarText(rename.next)
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="title-rename-heading"
+      className="fixed inset-0 z-50 grid place-items-center bg-ink/25 px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-edge bg-paper p-5 text-ink shadow-xl">
+        <h2 id="title-rename-heading" className="text-lg font-bold">반복 일정 이름 변경</h2>
+        <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+          {previous}을(를) {next}로 바꿀까요?
+        </p>
+        <div className="mt-5 grid gap-2">
+          <button type="button" disabled={saving !== null}
+            onClick={() => { setSaving('one'); startTransition(async () => { await onPick('one'); setSaving(null) }) }}
+            className="min-h-11 rounded-lg border border-rule px-4 text-left text-sm hover:bg-frame/40 disabled:opacity-50">
+            이 날짜만 변경
+          </button>
+          <button type="button" disabled={saving !== null}
+            onClick={() => { setSaving('all'); startTransition(async () => { await onPick('all'); setSaving(null) }) }}
+            className="min-h-11 rounded-lg bg-frame px-4 text-left text-sm font-semibold hover:bg-edge/60 disabled:opacity-50">
+            반복 일정 전체 변경
+          </button>
+        </div>
+        <button type="button" disabled={saving !== null} onClick={onClose}
+          className="mt-4 min-h-10 rounded-lg px-3 text-sm text-ink-faint hover:bg-frame/25 disabled:opacity-50">
+          취소
+        </button>
+      </div>
+    </div>
   )
 }
 

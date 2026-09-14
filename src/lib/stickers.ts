@@ -19,16 +19,15 @@ export function stickerSrc(key: string | null | undefined): string | null {
 /**
  * 형광펜 색.
  *
- * 노랑을 쓰다가 초록으로 바꿨다. 노트 표지도 노랑이라 도구 막대에 놓인 형광펜이
- * 배경에 묻혀 보이지 않았고, 크림색 종이 위에서도 칠한 자리가 잘 드러나지 않았다.
+ * 핑크빛 보라 노트에 어울리도록 라일락·오키드·로즈 세 색을 쓴다.
  *
  * 펜 색과 같은 이유로 토큰이 아니라 값을 직접 적는다 (toolbar.tsx 의 PENS 주석).
  * 글 안에 저장되는 색이라 var() 를 쓰면 sanitize.ts 가 걸러낸다.
  */
 export const HIGHLIGHTS = [
-  { key: 'pink', label: '분홍', hex: '#F7B8CE' },
-  { key: 'green', label: '초록', hex: '#A8DE8A' },
-  { key: 'yellow', label: '노랑', hex: '#F3ED7A' },
+  { key: 'lavender', label: '라벤더', hex: '#C7A0F4' },
+  { key: 'orchid', label: '오키드', hex: '#ED96D8' },
+  { key: 'rose', label: '로즈', hex: '#FF9FBD' },
 ] as const
 
 export type HighlightKey = (typeof HIGHLIGHTS)[number]['key']
@@ -41,13 +40,16 @@ export const HIGHLIGHT = HIGHLIGHTS[1].hex
  *
  * 칠한 자리를 다시 그으면 지워지는데, 그러려면 "이미 칠해져 있다"를 알아봐야
  * 한다. 세 색 중 어느 것으로 칠했든 지워져야 하므로 전부 여기 넣는다.
- * 노랑은 색을 바꾸기 전에 쓰던 색이기도 해서 옛 글도 이걸로 알아본다.
+ * 이전 테마에서 칠한 자리도 다시 그으면 지울 수 있도록 옛 색도 함께 보관한다.
  */
-export const HIGHLIGHT_COLORS = HIGHLIGHTS.map((h) => h.hex)
+export const HIGHLIGHT_COLORS = [
+  ...HIGHLIGHTS.map((h) => h.hex),
+  '#F7B8CE', '#A8DE8A', '#F3ED7A',
+]
 
 /**
  * 밑줄 색. 형광펜과 달리 글 안에 색으로 저장되지 않는다.
  * 밑줄은 "밑줄이 그어져 있다"는 사실만 저장하고 (text-decoration: underline)
  * 실제로 보이는 줄은 화면에 그린다 (components/paper-block.tsx).
  */
-export const UNDERLINE_COLOR = '#C1453C'
+export const UNDERLINE_COLOR = '#C14D7A'
