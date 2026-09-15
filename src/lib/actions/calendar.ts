@@ -57,7 +57,8 @@ export async function saveCalendarChanges(input: {
           return { error: '해당 날짜의 반복 항목을 찾지 못했습니다.' }
         }
       }
-      if ((change.type === 'repeat' || change.type === 'skip' || change.type === 'memo') && !note.tasks.some((task) => task.id === change.id)) {
+      if ((change.type === 'repeat' || change.type === 'skip' || change.type === 'memo' || change.type === 'move') &&
+          !note.tasks.some((task) => task.id === change.id)) {
         return { error: '반복할 항목을 찾지 못했습니다.' }
       }
       if (change.type === 'complete') {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  applyCalendarChange, blankCalendarNote, calendarContent, calendarOccurrences,
+  applyCalendarChange, blankCalendarNote, calendarContent, calendarMoveChanges, calendarOccurrences,
   calendarTitles, readCalendarNote,
+  type CalendarDatedChange, type CalendarDragItem, type CalendarNote, type CalendarSource,
 } from '@/lib/calendar-reminders'
 
 describe('달력 제목과 개별 할 일', () => {
@@ -107,5 +108,99 @@ describe('달력 제목과 개별 할 일', () => {
 
     expect(note.titleMemo).toBe('회의실 301호')
     expect(note.tasks[0].memo).toBe('자료를 미리 공유하기')
+  })
+})
+
+describe('일정 줄 옮기기', () => {
+  function listOf(date: string, ...texts: string[]): CalendarSource {
+    let note = blankCalendarNote()
+    for (const text of texts) note = applyCalendarChange(note, { type: 'text', id: text, text, kind: 'todo' })
+    return { date, note, color: null }
+  }
+
+  function grab(source: CalendarSource, id: string, extra: Partial<CalendarDragItem> = {}): CalendarDragItem {
+    const task = source.note.tasks.find((task) => task.id === id)!
+    return {
+      sourceDate: source.date, occurrenceDate: source.date, id, kind: task.kind ?? 'todo',
+      text: task.text, memo: task.memo ?? '', repeat: task.repeat, endsAt: task.endsAt, done: false, ...extra,
+    }
+  }
+
+  function applyAll(sources: CalendarSource[], changes: CalendarDatedChange[]): Map<string, CalendarNote> {
+    const notes = new Map(sources.map((source) => [source.date, source.note]))
+    for (const { date, change } of changes) {
+      notes.set(date, applyCalendarChange(notes.get(date) ?? blankCalendarNote(), change))
+    }
+    return notes
+  }
+
+  const ids = () => {
+    let count = 0
+    return () => `new-${++count}`
+  }
+
+  it('맨 위로 넣으면 첫 줄 앞에 들어간다', () => {
+    let note = listOf('2026-09-09', 'a', 'b').note
+    note = applyCalendarChange(note, { type: 'text', id: 'c', text: 'c', afterId: null })
+    expect(note.tasks.map((task) => task.id)).toEqual(['c', 'a', 'b'])
+  })
+
+  it('같은 날 안에서는 항목을 그대로 옮기고 제자리면 아무것도 바꾸지 않는다', () => {
+    const source = listOf('2026-09-09', 'a', 'b', 'c')
+    const changes = calendarMoveChanges([source], grab(source, 'c'), { date: '2026-09-09', place: 'after', afterId: null }, ids())
+    expect(changes).toEqual([{ date: '2026-09-09', change: { type: 'move', id: 'c', afterId: null } }])
+    expect(applyAll([source], changes).get('2026-09-09')!.tasks.map((task) => task.id)).toEqual(['c', 'a', 'b'])
+    expect(calendarMoveChanges([source], grab(source, 'b'), { date: '2026-09-09', place: 'after', afterId: 'b' }, ids())).toEqual([])
+  })
+
+  it('다른 날로 옮기면 원래 날에서 빠지고 체크 여부까지 따라간다', () => {
+    const source = listOf('2026-09-09', 'a', 'b')
+    const target = listOf('2026-09-10', 'z')
+    const changes = calendarMoveChanges([source, target], grab(source, 'a', { done: true }), { date: '2026-09-10', place: 'after', afterId: 'z' }, ids())
+    const notes = applyAll([source, target], changes)
+    expect(notes.get('2026-09-09')!.tasks.map((task) => task.text)).toEqual(['b'])
+    expect(notes.get('2026-09-10')!.tasks.map((task) => task.text)).toEqual(['z', 'a'])
+    expect(notes.get('2026-09-10')!.tasks[1].completedDates).toEqual(['2026-09-10'])
+  })
+
+  it('반복 일정은 그 날 하나만 옮기고 나머지 반복은 남는다', () => {
+    let note = applyCalendarChange(blankCalendarNote(), { type: 'text', id: 'gym', text: '운동', kind: 'todo' })
+    note = applyCalendarChange(note, { type: 'repeat', id: 'gym', repeat: 'weekly', endsAt: null })
+    const source: CalendarSource = { date: '2026-09-09', note, color: null }
+    const drag = { ...grab(source, 'gym'), occurrenceDate: '2026-09-16' }
+    const changes = calendarMoveChanges([source], drag, { date: '2026-09-17', place: 'after', afterId: null }, ids())
+    const notes = applyAll([source], changes)
+    const moved = [
+      { date: '2026-09-09', note: notes.get('2026-09-09')!, color: null },
+      { date: '2026-09-17', note: notes.get('2026-09-17')!, color: null },
+    ]
+    expect(calendarOccurrences(moved, '2026-09-16')).toEqual([])
+    expect(calendarOccurrences(moved, '2026-09-17').map((row) => row.task.text)).toEqual(['운동'])
+    expect(calendarOccurrences(moved, '2026-09-23').map((row) => row.task.text)).toEqual(['운동'])
+  })
+
+  it('대표 일정을 빈 날의 대표 자리로 옮긴다', () => {
+    const source: CalendarSource = { date: '2026-09-09', note: applyCalendarChange(blankCalendarNote(), { type: 'title', text: '기말고사' }), color: null }
+    const drag: CalendarDragItem = { sourceDate: '2026-09-09', occurrenceDate: '2026-09-09', id: null, kind: 'event', text: '기말고사', memo: '', repeat: 'none', endsAt: null, done: false }
+    const notes = applyAll([source], calendarMoveChanges([source], drag, { date: '2026-09-11', place: 'title' }, ids()))
+    expect(notes.get('2026-09-09')!.title).toBe('')
+    expect(notes.get('2026-09-11')!.title).toBe('기말고사')
+  })
+
+  it('대표 자리가 차 있으면 원래 대표 일정을 첫 줄로 밀어낸다', () => {
+    const source = listOf('2026-09-09', '발표')
+    const target: CalendarSource = { date: '2026-09-10', note: applyCalendarChange(blankCalendarNote(), { type: 'title', text: '면접' }), color: null }
+    const drag = grab(source, '발표', { kind: 'event' })
+    const notes = applyAll([source, target], calendarMoveChanges([source, target], drag, { date: '2026-09-10', place: 'title' }, ids()))
+    expect(notes.get('2026-09-10')!.title).toBe('발표')
+    expect(notes.get('2026-09-10')!.tasks.map((task) => task.text)).toEqual(['면접'])
+  })
+
+  it('체크박스는 대표 자리에 놓아도 목록 맨 위로 간다', () => {
+    const source = listOf('2026-09-09', '우유 사기')
+    const notes = applyAll([source], calendarMoveChanges([source], grab(source, '우유 사기'), { date: '2026-09-09', place: 'title' }, ids()))
+    const note = notes.get('2026-09-09')!
+    expect(note.title).toBe('')
+    expect(note.tasks.map((task) => [task.text, task.kind])).toEqual([['우유 사기', 'todo']])
   })
 })

@@ -46,8 +46,9 @@ export function CalendarCell({ date, weekStart, ym, taskCount, isToday, inMonth,
     </button>
   )
 
+  // 편집기가 칸 높이를 다 차지해야 빈 자리에도 일정을 끌어다 놓을 수 있다.
   return <div data-calendar-date={date} className={`min-w-0 flex-1 border-r border-b border-rule px-1 pt-0.5 pb-1 ${inMonth ? '' : 'bg-desk/50'}`}>
-    <CalendarDayEditor date={date} controller={controller} onDetails={onDetails} onRenameTitle={onRenameTitle}
+    <CalendarDayEditor date={date} controller={controller} onDetails={onDetails} onRenameTitle={onRenameTitle} className="h-full"
       leading={<Link href={`/week/${weekStart}?from=${ym}`} aria-label={`${dayNumber(date)}일 주간 페이지로 이동`}
         className={`${dateClass} transition-colors hover:bg-frame/60`}>{dayNumber(date)}</Link>} />
   </div>

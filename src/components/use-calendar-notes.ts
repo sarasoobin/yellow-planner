@@ -56,8 +56,11 @@ export function useCalendarNotes(initialSources: CalendarSource[]) {
     const last = queue.current.at(-1)
     if (last?.date === date && last.change.type === change.type &&
       (change.type === 'title' || (change.type === 'text' && last.change.type === 'text' && last.change.id === change.id))) {
-      // 새 항목의 삽입 위치는 이후 타이핑에도 유지한다.
-      if (change.type === 'text' && last.change.type === 'text') change = { ...last.change, ...change }
+      // 새 항목의 삽입 위치는 이후 타이핑에도 유지한다. 맨 위(null)도 자리 지정이다.
+      if (change.type === 'text' && last.change.type === 'text') {
+        const afterId = change.afterId === undefined ? last.change.afterId : change.afterId
+        change = { ...last.change, ...change, afterId }
+      }
       last.change = change
     } else queue.current.push({ date, change })
     setStatus('pending')
