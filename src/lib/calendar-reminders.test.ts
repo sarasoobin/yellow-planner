@@ -37,6 +37,16 @@ describe('달력 제목과 개별 할 일', () => {
     expect(calendarContent(note, '2026-09-09')).toBe('☐ 책 읽기<br>☐ 자료 제출')
   })
 
+  it('기간 일정은 시작일과 종료일을 포함한 모든 날짜에 표시된다', () => {
+    let note = applyCalendarChange(blankCalendarNote(), { type: 'title', text: '제주 여행' })
+    note = applyCalendarChange(note, { type: 'titleRepeat', repeat: 'daily', endsAt: '2026-09-27T23:59' })
+    const sources = [{ date: '2026-09-24', note, color: null }]
+
+    expect(calendarTitles(sources, '2026-09-24')).toEqual(['제주 여행'])
+    expect(calendarTitles(sources, '2026-09-27')).toEqual(['제주 여행'])
+    expect(calendarTitles(sources, '2026-09-28')).toEqual([])
+  })
+
   it('저장 재시도는 중복 항목을 만들지 않고 다른 항목의 반복 설정을 보존한다', () => {
     const add = { type: 'text', id: 'one', text: '운동' } as const
     let note = applyCalendarChange(blankCalendarNote(), add)
