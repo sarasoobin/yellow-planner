@@ -8,6 +8,7 @@ import {
   calendarNoteSchema, calendarTaskSkippedDates, readCalendarNote, type CalendarChange, type CalendarNote,
 } from '@/lib/calendar-reminders'
 import { repeatsOn } from '@/lib/repetition'
+import { normalizeRichHtmlEntities } from '@/lib/rich-text'
 import { sanitizeRich } from '@/lib/sanitize'
 import type { FormState, ItemStyle } from '@/lib/types'
 
@@ -19,11 +20,11 @@ const requestSchema = z.object({
 function sanitizeCalendarNote(note: CalendarNote): CalendarNote {
   return {
     ...note,
-    title: sanitizeRich(note.title),
+    title: normalizeRichHtmlEntities(sanitizeRich(note.title)),
     titleOverrides: Object.fromEntries(
-      Object.entries(note.titleOverrides ?? {}).map(([date, title]) => [date, sanitizeRich(title)]),
+      Object.entries(note.titleOverrides ?? {}).map(([date, title]) => [date, normalizeRichHtmlEntities(sanitizeRich(title))]),
     ),
-    tasks: note.tasks.map((task) => ({ ...task, text: sanitizeRich(task.text) })),
+    tasks: note.tasks.map((task) => ({ ...task, text: normalizeRichHtmlEntities(sanitizeRich(task.text)) })),
   }
 }
 

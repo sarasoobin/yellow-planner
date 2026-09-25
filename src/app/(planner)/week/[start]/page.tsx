@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { addDays } from 'date-fns'
 import { notFound, redirect } from 'next/navigation'
@@ -24,6 +25,17 @@ type Params = {
   // Next.js 16에서 searchParams는 Promise다. 반드시 await 해야 한다.
   searchParams: Promise<{ from?: string }>
 }
+
+/** 주간 머리글의 작은 장식. 한 주에 한 장씩 바뀌어 부담 없이 보인다. */
+const WEEK_CHARACTERS = [
+  { src: '/mandu/weekly-star.jpeg', width: 210, height: 210 },
+  { src: '/mandu/weekly-angel.jpeg', width: 736, height: 736 },
+  { src: '/mandu/weekly-flying.jpeg', width: 210, height: 210 },
+  { src: '/mandu/weekly-loading.jpeg', width: 735, height: 736 },
+  { src: '/mandu/weekly-heart.jpeg', width: 210, height: 210 },
+  { src: '/mandu/weekly-happy.jpeg', width: 210, height: 210 },
+  { src: '/mandu/weekly-heart-beam.jpeg', width: 210, height: 210 },
+] as const
 
 export async function generateMetadata({ params }: Params) {
   const { start } = await params
@@ -58,6 +70,7 @@ export default async function WeekPage({ params, searchParams }: Params) {
   const nextQuery = `?from=${cameFrom ?? weekOwnerMonth(nextWeek)}`
   // 저장 뒤 화면을 새로 그릴 경로. 쿼리를 붙이면 revalidatePath 가 못 알아본다
   const path = `/week/${monday}`
+  const character = WEEK_CHARACTERS[Math.floor((Number(monday.slice(8, 10)) - 1) / 7) % WEEK_CHARACTERS.length]
 
   const supabase = await createClient()
   const {
@@ -115,10 +128,20 @@ export default async function WeekPage({ params, searchParams }: Params) {
       path={path}
       className="flex flex-1 flex-col bg-paper px-3 py-3 md:px-4 md:py-4"
     >
-      <header className="mb-2 flex items-baseline justify-between gap-3">
-        <h1 className="font-hand text-2xl leading-none text-ink">
+      <header className="mb-2 flex items-center justify-between gap-2 md:gap-3">
+        <h1 className="min-w-0 truncate font-hand text-xl leading-none text-ink md:text-2xl">
           {weekRangeLabel(monday)}
         </h1>
+        {/* 적는 칸과 겹치지 않는 머리글 여백의 작은 캐릭터 */}
+        <Image
+          aria-hidden
+          src={character.src}
+          alt=""
+          width={character.width}
+          height={character.height}
+          sizes="48px"
+          className="pointer-events-none size-8 shrink-0 object-contain mix-blend-multiply md:size-12"
+        />
         <nav aria-label="주간 이동" className="flex shrink-0 items-center gap-2 text-xs text-ink-faint">
           <Link href={`/week/${prevWeek}${prevQuery}`} className="grid size-7 place-items-center rounded-full hover:bg-frame/60 hover:text-accent" aria-label="이전 주">
             ‹

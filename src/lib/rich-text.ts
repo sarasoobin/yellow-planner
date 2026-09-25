@@ -15,6 +15,47 @@ export function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;')
 }
 
+const TEXT_ENTITIES: Record<string, string> = {
+  '&nbsp;': ' ',
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+}
+
+const textEntityPattern = /&(nbsp|amp|lt|gt|quot|#39);/g
+
+/**
+ * HTML 엔티티를 글자로 되돌린다.
+ *
+ * 예전 일정에는 `&amp;amp;`처럼 엔티티가 여러 번 저장된 경우가 있다.
+ * 안정적으로 복구할 수 있게 몇 겹이든(현실적인 범위 안에서) 벗긴다.
+ */
+function decodeTextEntities(value: string): string {
+  let decoded = value
+  for (let depth = 0; depth < 8; depth += 1) {
+    const next = decoded.replace(textEntityPattern, (entity) => TEXT_ENTITIES[entity] ?? entity)
+    if (next === decoded) return decoded
+    decoded = next
+  }
+  return decoded
+}
+
+/**
+ * HTML 안의 이중 이스케이프만 한 겹씩 벗긴다.
+ * `&lt;`를 실제 태그 문자 `<`로 바꾸지는 않으므로, 저장된 HTML의 안전성은 유지한다.
+ */
+export function normalizeRichHtmlEntities(html: string): string {
+  let normalized = html
+  for (let depth = 0; depth < 8; depth += 1) {
+    const next = normalized.replace(/&amp;(?=(?:nbsp|amp|lt|gt|quot|#39);)/g, '&')
+    if (next === normalized) return normalized
+    normalized = next
+  }
+  return normalized
+}
+
 /**
  * 저장된 내용을 화면에 뿌릴 HTML로.
  *
@@ -26,9 +67,9 @@ export function escapeHtml(text: string): string {
 export function toDisplayHtml(stored: string): string {
   if (!stored) return ''
   if (!/<[a-z/]/i.test(stored)) {
-    return escapeHtml(stored).replace(/\n/g, '<br>')
+    return escapeHtml(decodeTextEntities(stored)).replace(/\n/g, '<br>')
   }
-  return stored
+  return normalizeRichHtmlEntities(stored)
 }
 
 /**
@@ -37,19 +78,14 @@ export function toDisplayHtml(stored: string): string {
  */
 export function toPlainText(html: string): string {
   if (!html) return ''
-  return html
+  const text = html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(div|p)>/gi, '\n')
     .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
     // 크기 자리표로 넣어둔 눈에 안 보이는 글자 (paper-block.tsx ZERO_WIDTH).
     // 이걸 안 걷어내면 아무것도 안 적은 칸이 "적은 것 있음"으로 보인다.
     .replace(/​/g, '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
+  return decodeTextEntities(text)
 }
 
 /** 적은 게 있는가. 태그만 있고 글자가 없으면 빈 칸으로 본다. */

@@ -71,10 +71,10 @@ export function IndexTabs({
               href={tab.href}
               aria-current={on ? 'page' : undefined}
               style={{ backgroundColor: tab.color }}
-              className={`shrink-0 rounded-t-[3px] px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap text-ink transition-opacity ${
+              className={`shrink-0 rounded-t-[3px] border border-edge/65 px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap text-ink transition-opacity ${
                 on
                   ? 'opacity-100 shadow-[inset_0_-3px_0_rgba(89,55,91,.38)]'
-                  : 'opacity-55 hover:opacity-85'
+                  : 'opacity-85 hover:opacity-100'
               }`}
             >
               {tab.label}
@@ -99,10 +99,10 @@ export function IndexTabs({
             href={tab.href}
             aria-current={on ? 'page' : undefined}
             style={{ backgroundColor: tab.color }}
-            className={`flex h-9 items-center justify-center rounded-r-[3px] text-xs font-semibold text-ink transition-all ${
+            className={`flex h-9 items-center justify-center rounded-r-[3px] border border-edge/65 text-xs font-semibold text-ink transition-all ${
               on
               ? 'w-[58px] opacity-100 shadow-[1px_1px_3px_rgba(89,55,91,.22)]'
-                : 'w-[46px] opacity-65 hover:w-[52px] hover:opacity-95'
+                : 'w-[46px] opacity-85 hover:w-[52px] hover:opacity-100'
             }`}
           >
             {tab.label}

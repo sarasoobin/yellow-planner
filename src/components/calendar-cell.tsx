@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { CalendarDayEditor, type CalendarTitleRename } from '@/components/calendar-day-editor'
 import type { CalendarController } from '@/components/use-calendar-notes'
 import type { RepeatSelection } from '@/components/calendar-repeat-dialog'
-import { calendarOccurrences, calendarTaskKind, calendarTitles, hasCalendarText } from '@/lib/calendar-reminders'
+import { calendarOccurrences, calendarTaskKind, calendarText, calendarTitles, hasCalendarText } from '@/lib/calendar-reminders'
 import { dayNumber } from '@/lib/dates'
 
 /** 작은 화면은 날짜를 고르고 아래에서 편집한다. 넓은 화면은 칸 안에서 편집한다. */
@@ -25,22 +25,46 @@ export function CalendarCell({ date, weekStart, ym, taskCount, isToday, inMonth,
   onRenameTitle: (rename: CalendarTitleRename) => void
 }) {
   const titles = calendarTitles(controller.sources, date)
-  const count = titles.length +
-    calendarOccurrences(controller.sources, date).filter((row) =>
-      calendarTaskKind(row.task) === 'todo' && hasCalendarText(row.task.text)).length
-  const source = controller.sources.find((source) => source.date === date)
+  const todos = calendarOccurrences(controller.sources, date)
+    .filter((row) => calendarTaskKind(row.task) === 'todo' && hasCalendarText(row.task.text))
+    .map((row) => ({
+      key: `${row.sourceDate}:${row.task.id}`,
+      text: calendarText(row.task.text),
+      done: row.task.completedDates.includes(date),
+    }))
+  const entries = [
+    ...titles.map((text, index) => ({ key: `title:${index}`, text, done: null as boolean | null })),
+    ...todos,
+  ]
+  const count = entries.length
+  // 압축 달력에서도 일정과 체크리스트를 글자로 남긴다. 칸이 좁아지면 일부만
+  // 보여주고, 나머지는 `…`와 날짜를 눌렀을 때 열리는 상세 편집기로 이어진다.
+  const firstTitle = entries[0]?.text
   const dateClass = `grid size-[23px] shrink-0 place-items-center rounded-full text-[13px] leading-none ${
     isToday ? 'bg-today font-bold text-paper' : inMonth ? 'text-ink-soft' : 'text-ink-faint/60'
   }`
 
   if (narrow) return (
     <button type="button" aria-pressed={picked}
-      aria-label={`${dayNumber(date)}일${count ? `, 일정과 할 일 ${count}개` : ''}`}
+      aria-label={`${dayNumber(date)}일${firstTitle ? `, ${firstTitle}` : ''}${count ? `, 일정과 할 일 ${count}개` : ''}`}
       onClick={() => onPick(date)}
-      className={`flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-[3px] border-r border-b border-rule px-[3px] pt-1 pb-1.5 ${picked ? 'bg-frame/70' : inMonth ? '' : 'bg-desk/50'}`}>
+      className={`flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-[3px] border-r border-b border-rule px-[3px] pt-1 pb-1.5 sm:min-h-[74px] sm:gap-1 sm:px-1 sm:pt-1.5 ${picked ? 'bg-frame/70' : inMonth ? '' : 'bg-desk/50'}`}>
       <span className={dateClass}>{dayNumber(date)}</span>
-      <span aria-hidden className="flex w-full flex-col gap-[2px]">
-        {Array.from({ length: Math.min(count, 3) }, (_, index) => <span key={index} className="h-[3px] w-full" style={{ backgroundColor: source?.color ?? 'var(--color-today)' }} />)}
+      <span className="flex w-full min-w-0 flex-col gap-px text-left">
+        {entries.slice(0, 3).map((entry, index) => (
+          <span
+            key={entry.key}
+            title={entry.text}
+            className={`truncate px-px text-[8px] leading-[11px] text-ink-soft sm:text-[10px] sm:leading-[13px] ${
+              index === 2 ? 'hidden sm:block' : ''
+            } ${entry.done === null ? 'font-semibold' : entry.done ? 'text-ink-faint line-through' : ''}`}
+          >
+            {entry.done === null ? '• ' : entry.done ? '☑ ' : '☐ '}
+            {entry.text}
+          </span>
+        ))}
+        {entries.length > 2 && <span aria-hidden className="px-px text-[9px] leading-3 text-ink-faint sm:hidden">…</span>}
+        {entries.length > 3 && <span aria-hidden className="hidden px-px text-[10px] leading-3 text-ink-faint sm:block">…</span>}
       </span>
       {taskCount > 0 && <span className="mt-auto text-[9px] text-ink-faint" aria-label={`주간 할 일 ${taskCount}개`}>{taskCount}</span>}
     </button>

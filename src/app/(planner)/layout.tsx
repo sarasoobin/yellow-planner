@@ -39,7 +39,7 @@ export default async function PlannerLayout({
         <div className="flex min-w-0 flex-1 flex-col bg-frame">
           <IndexTabs orientation="top" currentYear={currentYear} />
 
-          <header className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 md:px-5">
+          <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2.5 sm:flex-nowrap sm:px-4 sm:py-3 md:px-5">
             <Link
               href="/cover"
               className="flex shrink-0 items-baseline gap-1.5 text-accent"
@@ -50,10 +50,15 @@ export default async function PlannerLayout({
               </span>
             </Link>
 
-            {/* 필통 — 여기서 고른 도구로 다음에 적는 글이 저장된다 */}
-            <Toolbar />
+            {/*
+              좁은 폰에서는 필통을 둘째 줄에 둔다. 로고·로그아웃과 한 줄에
+              억지로 넣지 않아 320px 폭에서도 버튼이 잘리지 않는다.
+            */}
+            <div className="order-3 flex basis-full justify-center sm:order-2 sm:basis-auto">
+              <Toolbar />
+            </div>
 
-            <div className="flex shrink-0 items-center gap-3 text-xs text-ink-soft">
+            <div className="order-2 flex shrink-0 items-center gap-3 text-xs text-ink-soft sm:order-3">
               <span className="hidden max-w-[16ch] truncate md:inline">
                 {user?.email}
               </span>

@@ -19,15 +19,15 @@ export function stickerSrc(key: string | null | undefined): string | null {
 /**
  * 형광펜 색.
  *
- * 핑크빛 보라 노트에 어울리도록 라일락·오키드·로즈 세 색을 쓴다.
+ * 보라에서 핑크까지 자연스럽게 이어지는 세 색을 쓴다.
  *
  * 펜 색과 같은 이유로 토큰이 아니라 값을 직접 적는다 (toolbar.tsx 의 PENS 주석).
  * 글 안에 저장되는 색이라 var() 를 쓰면 sanitize.ts 가 걸러낸다.
  */
 export const HIGHLIGHTS = [
-  { key: 'lavender', label: '라벤더', hex: '#C7A0F4' },
-  { key: 'orchid', label: '오키드', hex: '#ED96D8' },
-  { key: 'rose', label: '로즈', hex: '#FF9FBD' },
+  { key: 'lavender', label: '라벤더', hex: '#D7BDF1' },
+  { key: 'orchid', label: '오키드', hex: '#F0B7DD' },
+  { key: 'rose', label: '로즈', hex: '#F8C0C9' },
 ] as const
 
 export type HighlightKey = (typeof HIGHLIGHTS)[number]['key']
@@ -44,6 +44,9 @@ export const HIGHLIGHT = HIGHLIGHTS[1].hex
  */
 export const HIGHLIGHT_COLORS = [
   ...HIGHLIGHTS.map((h) => h.hex),
+  // 바로 전 팔레트도 다시 칠하면 정상적으로 지울 수 있게 남겨둔다.
+  '#B98BEA', '#E17BC9', '#F59AAC',
+  '#C9A8F2', '#DE9BE8', '#F3A4C4',
   '#F7B8CE', '#A8DE8A', '#F3ED7A',
 ]
 

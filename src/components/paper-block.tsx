@@ -618,6 +618,7 @@ export function PaperBlock({
   color,
   style,
   minRows = 4,
+  desktopMinRows,
   placeholder = '',
   lineHeight,
   ruled = true,
@@ -635,6 +636,8 @@ export function PaperBlock({
   style?: ItemStyle | null
   /** 최소 몇 줄만큼 자리를 잡아둘지 */
   minRows?: number
+  /** lg(1024px) 이상에서 쓸 최소 줄 수. 반응형 메모 칸에만 쓴다. */
+  desktopMinRows?: number
   placeholder?: string
   /** 줄 간격. 달력 칸처럼 좁은 곳은 작게 준다 */
   lineHeight?: number
@@ -1165,14 +1168,15 @@ export function PaperBlock({
           }}
           dangerouslySetInnerHTML={initialHtml}
           style={{
-            minHeight: `${minRows * rowHeight}px`,
+            '--paper-block-min-height': `${minRows * rowHeight}px`,
+            '--paper-block-lg-min-height': `${(desktopMinRows ?? minRows) * rowHeight}px`,
             lineHeight: `${rowHeight}px`,
             textIndent: firstLineIndent ? `${firstLineIndent}px` : undefined,
             color: color ?? undefined,
             fontSize: `${fontSize}px`,
             backgroundImage: ruled ? ruledGradient(rowHeight) : undefined,
-          }}
-          className={`w-full flex-1 break-words whitespace-pre-wrap outline-none ${
+          } as React.CSSProperties}
+          className={`min-h-[var(--paper-block-min-height)] w-full flex-1 break-words whitespace-pre-wrap outline-none lg:min-h-[var(--paper-block-lg-min-height)] ${
             firstLineBold ? 'first-line:font-bold' : ''
           }`}
         />
