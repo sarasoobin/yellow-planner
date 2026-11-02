@@ -26,14 +26,14 @@ export function LoginForm({ next }: { next: string }) {
         </span>
       </h1>
       <p className="mb-8 text-sm text-ink-faint">
-        {isSignIn ? '다시 오셨네요.' : '공책 한 권을 새로 펼칩니다.'}
+        {isSignIn ? 'Welcome back.' : 'A fresh planner is waiting for you.'}
       </p>
 
       <form action={formAction} className="flex flex-col gap-3">
         <input type="hidden" name="next" value={next} />
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-ink-soft">이메일</span>
+          <span className="text-ink-soft">Email</span>
           <input
             name="email"
             type="email"
@@ -44,7 +44,7 @@ export function LoginForm({ next }: { next: string }) {
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-ink-soft">비밀번호</span>
+          <span className="text-ink-soft">Password</span>
           <input
             name="password"
             type="password"
@@ -71,7 +71,7 @@ export function LoginForm({ next }: { next: string }) {
           disabled={pending}
           className="mt-2 cursor-pointer bg-accent px-3 py-2 font-semibold text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? '처리 중…' : isSignIn ? '로그인' : '가입하기'}
+          {pending ? 'Working…' : isSignIn ? 'Sign in' : 'Create account'}
         </button>
       </form>
 
@@ -81,8 +81,8 @@ export function LoginForm({ next }: { next: string }) {
         className="mt-4 cursor-pointer text-sm text-ink-faint underline underline-offset-4 hover:text-accent"
       >
         {isSignIn
-          ? '계정이 없으신가요? 가입하기'
-          : '이미 계정이 있으신가요? 로그인'}
+          ? 'New here? Create an account'
+          : 'Already have an account? Sign in'}
       </button>
     </div>
   )

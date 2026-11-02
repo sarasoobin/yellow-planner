@@ -82,14 +82,14 @@ type Option = {
 }
 
 const SIZE_LABELS: { key: SizeKey; label: string }[] = [
-  { key: 'sm', label: '작게' },
-  { key: 'lg', label: '크게' },
-  { key: 'xl', label: '아주 크게' },
+  { key: 'sm', label: 'Small' },
+  { key: 'lg', label: 'Large' },
+  { key: 'xl', label: 'Extra large' },
 ]
 
 const CHECK_OPTION: Option = {
   key: 'check',
-  label: '체크박스',
+  label: 'Checkbox',
   alias: 'checkbox todo box',
   icon: <span className="text-[14px] leading-none">{BOX}</span>,
   command: { kind: 'insert', text: `${BOX} ` },
@@ -99,25 +99,25 @@ const CHECK_OPTION: Option = {
 const STYLE_OPTIONS: Option[] = [
   {
     key: 'bold',
-    label: '굵게',
+    label: 'Bold',
     alias: 'bold',
     icon: <span className="text-[12px] font-bold">B</span>,
     command: { kind: 'exec', name: 'bold' },
   },
   {
     key: 'italic',
-    label: '기울임',
+    label: 'Italic',
     alias: 'italic',
     icon: <span className="font-serif text-[12px] italic">I</span>,
     command: { kind: 'exec', name: 'italic' },
   },
   {
     key: 'underline',
-    label: '밑줄',
+    label: 'Underline',
     alias: 'underline',
     icon: (
       <span className="flex flex-col items-center gap-[2px]">
-        <span className="text-[11px] leading-none">가</span>
+        <span className="text-[11px] leading-none">A</span>
         <span
           className="block h-[2px] w-3 rounded-full"
           style={{ backgroundColor: UNDERLINE_COLOR }}
@@ -128,7 +128,7 @@ const STYLE_OPTIONS: Option[] = [
   },
   ...HIGHLIGHTS.map((pen) => ({
     key: `highlight-${pen.key}`,
-    label: `${pen.label} 형광펜`,
+    label: `${pen.label} highlighter`,
     alias: `highlight marker ${pen.key} ${pen.label}`,
     icon: (
       <span
@@ -140,7 +140,7 @@ const STYLE_OPTIONS: Option[] = [
   })),
   ...PENS.map((pen) => ({
     key: `pen-${pen.key}`,
-    label: `${pen.label} 펜`,
+    label: `${pen.label} pen`,
     alias: `pen color ${pen.key}`,
     icon: (
       <span
@@ -161,7 +161,7 @@ const STYLE_OPTIONS: Option[] = [
         // 메뉴 아이콘은 실제 크기를 줄여서 보여준다. 그대로 쓰면 메뉴가 들쭉날쭉해진다.
         style={{ fontSize: `${Math.min(Math.round(SIZES[size.key] * 0.72), 18)}px` }}
       >
-        가
+        A
       </span>
     ),
     command: { kind: 'size' as const, px: SIZES[size.key] },
@@ -624,7 +624,7 @@ export function PaperBlock({
   ruled = true,
   firstLineIndent,
   firstLineBold = false,
-  fontSize = 16,
+  fontSize = 17,
   className = '',
 }: {
   kind: ItemKind
@@ -1139,7 +1139,7 @@ export function PaperBlock({
           suppressContentEditableWarning
           role="textbox"
           aria-multiline="true"
-          aria-label={placeholder || '적는 곳'}
+          aria-label={placeholder || 'Writing area'}
           spellCheck={false}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
@@ -1383,11 +1383,11 @@ export function PaperBlock({
             onClick={save}
             className="ml-2 cursor-pointer underline underline-offset-2"
           >
-            다시 시도
+            Try again
           </button>
         </p>
       )}
-      {pending && <p className="pt-1 text-[11px] text-ink-faint">저장 중…</p>}
+      {pending && <p className="pt-1 text-[11px] text-ink-faint">Saving…</p>}
     </form>
   )
 }

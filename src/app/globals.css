@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Great+Vibes&display=swap');
 @import "tailwindcss";
 
 /* 나눔바른펜 — 글을 쓰는 플래너에 맞는 단정한 손글씨체 */
@@ -20,38 +21,55 @@
  * ═══════════════════════════════════════════════════════════════ */
 @theme {
   /* 노트 */
-  --color-frame: #ffffff; /* 노트 프레임 — 깨끗한 흰색 */
-  --color-edge: #e4c4e3; /* 인덱스·가장자리의 옅은 보라 포인트 */
-  --color-paper: #ffffff; /* 종이 — 달력·주간칸이 올라가는 면 */
-  --color-desk: #faf9fa; /* 책상 — 노트 바깥 배경 */
-  --color-rule: #eee7ee; /* 괘선·칸 구분선 */
+  --color-frame: #f8e8ee; /* 노트 프레임 — 블러시 핑크 */
+  --color-edge: #d9bdc9; /* 인덱스·가장자리의 펄 그레이 포인트 */
+  --color-paper: #fffdfd; /* 종이 — 아이보리 핑크 */
+  --color-desk: #f3e5ea; /* 책상 — 노트 바깥 배경 */
+  --color-rule: #e7d7dd; /* 괘선·칸 구분선 */
 
   /* 글자 */
-  --color-ink: #413342; /* 제목 */
-  --color-ink-soft: #604f61; /* 본문 */
-  --color-ink-faint: #9c8c9d; /* 보조·날짜 */
+  --color-ink: #683c13; /* 제목 */
+  --color-ink-soft: #5d4d58; /* 본문 */
+  --color-ink-faint: #89737e; /* 보조·날짜 */
 
   /* 강조 */
-  --color-accent: #914d8b; /* 버튼·활성 */
-  --color-today: #c14d7a; /* 오늘 (핑크 펜) */
-  --color-done: #6b8e5a; /* 완료 체크 */
+  --color-accent: #a8788d; /* 버튼·활성 */
+  --color-today: #ba6f8c; /* 오늘 (로즈 펜) */
+  --color-done: #7d9a80; /* 완료 체크 */
   --color-danger: #b23b32; /* 삭제·위험 */
 
   /* 나눔바른펜을 우선 쓰고, 불러오는 동안에는 고풍스러운 명조체로 이어진다. */
   --font-sans:
-    "NanumBarunpen", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Noto Serif KR",
-    "Nanum Myeongjo", "AppleMyungjo", "Batang", Georgia, serif;
+    "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --font-hand: "NanumBarunpen", "Iowan Old Style", "AppleMyungjo", "Batang", Georgia, serif;
+  --font-hand: "Great Vibes", "Snell Roundhand", "Apple Chancery", cursive;
 
   /* 공책 한 줄의 높이. 체크리스트와 괘선 메모가 모두 이 값을 쓴다. */
   --spacing-line: 28px;
 }
 
 body {
-  background: var(--color-desk);
+  background: #f3e5ea url('/textures/vintage-pearl-paper-v2.png') center / 900px auto fixed;
   color: var(--color-ink-soft);
+}
+
+/* Generated pearl-and-lace stationery: its bright center preserves writing contrast. */
+.vintage-paper {
+  background-color: var(--color-paper);
+  background-image: linear-gradient(rgba(255, 253, 253, 0.48), rgba(255, 253, 253, 0.48)), url('/textures/vintage-pearl-paper-v2.png');
+  background-position: center;
+  background-size: cover;
+  box-shadow: inset 0 0 0 1px rgba(233, 209, 220, 0.48), inset 0 0 70px rgba(255, 239, 246, 0.3);
+}
+
+/* 표지 연도는 레퍼런스의 은빛 양각 캘리그래피처럼 크게 띄운다. */
+.cover-year {
+  color: #683c13;
+  text-shadow:
+    -1px -1px 0 rgba(255, 255, 255, 0.95),
+    1px 1px 0 rgba(255, 255, 255, 0.82),
+    3px 4px 7px rgba(123, 101, 113, 0.24);
 }
 
 /* 노트가 책상 위에 놓인 느낌. 그림자는 아주 옅게만 (DESIGN.md §4) */

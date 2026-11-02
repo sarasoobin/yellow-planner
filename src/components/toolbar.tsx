@@ -26,9 +26,9 @@ import { HIGHLIGHTS, STICKERS, UNDERLINE_COLOR } from '@/lib/stickers'
  * 보라는 펜에만 쓰는 색이다.
  */
 export const PENS = [
-  { key: 'black', label: '먹색', hex: '#413342' },
-  { key: 'rose', label: '로즈', hex: '#C14D7A' },
-  { key: 'purple', label: '보라', hex: '#6956A6' },
+  { key: 'black', label: 'Ink', hex: '#5F5360' },
+  { key: 'rose', label: 'Rose', hex: '#BA6F8C' },
+  { key: 'purple', label: 'Lilac', hex: '#8C7AAE' },
 ] as const
 
 type ArmedState = {
@@ -103,11 +103,11 @@ export function Toolbar() {
     useArmedSticker()
 
   const hint = marker
-    ? '칠할 글자를 긁으세요'
+    ? 'Select text to highlight'
     : underline
-      ? '밑줄 그을 글자를 긁으세요'
+      ? 'Select text to underline'
       : armed
-        ? '붙일 자리를 누르세요'
+        ? 'Choose where to place it'
         : null
 
   return (
@@ -125,8 +125,8 @@ export function Toolbar() {
             key={pen.key}
             type="button"
             aria-pressed={on}
-            aria-label={`${pen.label} 형광펜`}
-            title={on ? '내려놓기' : `${pen.label} 형광펜 — 칠할 글자를 긁으세요`}
+            aria-label={`${pen.label} highlighter`}
+            title={on ? 'Put down' : `${pen.label} highlighter — select text to highlight`}
             onClick={() => setMarker(on ? null : pen.hex)}
             className={toolClass(on)}
           >
@@ -144,14 +144,14 @@ export function Toolbar() {
       <button
         type="button"
         aria-pressed={underline}
-        aria-label="밑줄"
-        title={underline ? '내려놓기' : '밑줄 — 그을 글자를 긁으세요'}
+        aria-label="Underline"
+        title={underline ? 'Put down' : 'Underline — select text to underline'}
         onClick={() => setUnderline(!underline)}
         className={toolClass(underline)}
       >
         <span aria-hidden className="flex flex-col items-center gap-[3px]">
           <span className="text-[11px] leading-none font-semibold text-ink">
-            가
+            A
           </span>
           <span
             className="block h-[2px] w-[15px] rounded-full"
@@ -172,7 +172,7 @@ export function Toolbar() {
             aria-pressed={on}
             aria-label={`${sticker.label} 스티커`}
             title={
-              on ? '내려놓기' : `${sticker.label} — 누른 뒤 붙일 자리를 누르세요`
+              on ? 'Put down' : `${sticker.label} — choose where to place it`
             }
             onClick={() => setArmed(on ? null : sticker.key)}
             className={toolClass(on)}

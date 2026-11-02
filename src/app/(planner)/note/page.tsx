@@ -4,7 +4,7 @@ import { StickerLayer } from '@/components/sticker-layer'
 import { FREE_NOTE_ANCHOR, type Item } from '@/lib/types'
 
 export const metadata = {
-  title: '메모 · 正 PLANNER',
+  title: 'Notes · 正 PLANNER',
 }
 
 export default async function FreeNotePage() {
@@ -35,7 +35,7 @@ export default async function FreeNotePage() {
       stickers={(stickerData ?? []) as Item[]}
       date={FREE_NOTE_ANCHOR}
       path="/note"
-      className="flex flex-1 flex-col bg-paper px-4 py-4 md:px-8 md:py-6"
+      className="vintage-paper flex flex-1 flex-col bg-paper px-4 py-4 md:px-8 md:py-6"
     >
       <h1 className="font-hand mb-2 text-3xl leading-none text-ink">
         Free Note
@@ -46,7 +46,7 @@ export default async function FreeNotePage() {
         weekStart={null}
         path="/note"
         rows={18}
-        placeholder="어디에도 안 들어가는 것을 적는 곳입니다"
+        placeholder="A place for anything that belongs nowhere else…"
       />
     </StickerLayer>
   )

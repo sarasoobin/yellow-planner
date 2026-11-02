@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { monthGrid, parseYearMonth, weekOwnerMonth, weekStartOf } from '@/lib/dates'
+import { monthGrid, parseYearMonth, shiftYearMonth, weekOwnerMonth, weekStartOf } from '@/lib/dates'
 
 describe('날짜 규칙', () => {
   it('주는 월요일에 시작한다', () => {
@@ -18,5 +18,10 @@ describe('날짜 규칙', () => {
 
   it('존재하지 않는 달은 거절한다', () => {
     expect(parseYearMonth('2026-13')).toBeNull()
+  })
+
+  it('12월 다음 달은 다음 해 1월으로 잇는다', () => {
+    expect(shiftYearMonth('2026-12', 1)).toBe('2027-01')
+    expect(shiftYearMonth('2027-01', -1)).toBe('2026-12')
   })
 })

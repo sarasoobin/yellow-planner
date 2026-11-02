@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 /** 로그인해야만 들어갈 수 있는 경로 */
-const PROTECTED_PREFIXES = ['/cover', '/month', '/week', '/note']
+const PROTECTED_PREFIXES = ['/cover', '/contents', '/month', '/week', '/note']
 
 /**
  * 모든 요청마다 실행되어 두 가지를 한다.

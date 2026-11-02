@@ -12,9 +12,9 @@ export default function LandingPage() {
           </span>
         </h1>
         <p className="max-w-md text-sm leading-relaxed text-ink-soft">
-          중요한 일정과 자잘한 할 일을 서로 다른 페이지에 적는 웹 다이어리.
+          A quiet place for plans, tasks, and little intentions.
           <br />
-          노란 공책 한 권을 1년 내내 쓰는 느낌으로.
+          A vintage paper planner for every season.
         </p>
       </div>
 
@@ -25,7 +25,7 @@ export default function LandingPage() {
           href="/login"
           className="text-sm text-ink-faint underline underline-offset-4 transition-colors hover:text-accent"
         >
-          내 노트 만들기
+          Create my planner
         </Link>
       </div>
     </main>

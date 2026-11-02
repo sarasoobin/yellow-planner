@@ -12,15 +12,14 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: '正 PLANNER',
     short_name: '正',
-    description:
-      '중요한 일정과 자잘한 할 일을 서로 다른 페이지에 적는 웹 다이어리',
-    lang: 'ko',
+    description: 'A vintage paper planner for days, tasks, and little intentions.',
+    lang: 'en',
     start_url: '/',
     display: 'standalone',
     // 노트 바깥 책상색 (--color-desk). 앱이 뜨는 동안 잠깐 보이는 바탕
-    background_color: '#f7f1f7',
+    background_color: '#f3e5ea',
     // 표지색 (--color-frame). 주소창·상태바가 이 색으로 물든다
-    theme_color: '#edc3e8',
+    theme_color: '#f8e8ee',
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

@@ -5,6 +5,7 @@ export const ITEM_KINDS = [
   'event',
   'task',
   'daily',
+  'contents',
   'sticker',
 ] as const
 export type ItemKind = (typeof ITEM_KINDS)[number]
@@ -19,7 +20,7 @@ export type ItemKind = (typeof ITEM_KINDS)[number]
  */
 export const SIZES = {
   sm: 13,
-  md: 16,
+  md: 17,
   lg: 20,
   xl: 26,
 } as const

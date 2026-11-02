@@ -47,9 +47,9 @@ export function repeatsOn(
 }
 
 export const REPEAT_LABELS: Record<RepeatFrequency, string> = {
-  none: '반복 안 함',
-  daily: '매일',
-  weekly: '매주',
-  monthly: '매월',
-  yearly: '매년',
+  none: 'Does not repeat',
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
 }

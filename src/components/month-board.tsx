@@ -54,7 +54,7 @@ export function MonthBoard({
             {WEEKDAY_LABELS.map((label, i) => (
               <div
                 key={label}
-                className={`flex-1 pb-1 text-center text-[12px] font-semibold ${
+                className={`flex-1 pb-1 text-center text-[13px] font-semibold ${
                   i === 6 ? 'text-today' : 'text-ink-faint'
                 }`}
               >
@@ -78,7 +78,7 @@ export function MonthBoard({
                     어느 달에서 눌렀는지 함께 넘긴다 (lib/dates.ts weekOwnerMonth) */}
                 <Link
                   href={`/week/${week[0].date}?from=${ym}`}
-                  aria-label={`${dayNumber(week[0].date)}일 주간 페이지로 이동`}
+                  aria-label={`Open the week of ${dayNumber(week[0].date)}`}
                   className="flex w-7 shrink-0 items-center justify-center border-r border-b border-rule text-ink-faint transition-colors hover:bg-frame/50 hover:text-accent"
                 >
                   ›
@@ -110,14 +110,14 @@ export function MonthBoard({
               {pickedDay ? (
                 <>
                   <div className="mb-1 flex items-baseline justify-between gap-2">
-                    <h2 className="text-[15px] font-semibold text-ink">
+                    <h2 className="text-base font-semibold text-ink">
                       {dayLabel(pickedDay.date)}
                     </h2>
                     <Link
                       href={`/week/${weekStartOfDay(weeks, pickedDay.date)}?from=${ym}`}
-                      className="shrink-0 text-xs text-ink-faint underline underline-offset-4"
+                      className="shrink-0 text-[13px] text-ink-faint underline underline-offset-4"
                     >
-                      이 주 할 일
+                      This week
                     </Link>
                   </div>
 
@@ -127,13 +127,13 @@ export function MonthBoard({
                     controller={controller}
                     onDetails={onDetails}
                     onRenameTitle={onRenameTitle}
-                    leading={<span className="grid size-6 shrink-0 place-items-center text-sm font-semibold">{dayNumber(pickedDay.date)}</span>}
+                    leading={<span className="grid size-6 shrink-0 place-items-center text-[15px] font-semibold">{dayNumber(pickedDay.date)}</span>}
                     mobile
                   />
                 </>
               ) : (
-                <p className="py-6 text-center text-[13px] text-ink-faint">
-                  날짜를 누르면 여기에서 적을 수 있습니다
+                <p className="py-6 text-center text-sm text-ink-faint">
+                  Select a day to write here
                 </p>
               )}
             </div>

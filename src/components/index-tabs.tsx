@@ -1,13 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import {
   COVER_COLOR,
+  CONTENTS_COLOR,
   MONTH_COLORS,
   NOTE_COLOR,
   yearMonth,
 } from '@/lib/month-colors'
+import { MONTH_LABELS } from '@/lib/dates'
 
 /**
  * 노트 옆에 붙는 인덱스 탭 14개 — 표지 · 1~12월 · 메모.
@@ -19,21 +21,24 @@ import {
 type Tab = { key: string; label: string; href: string; color: string }
 
 function buildTabs(year: number): Tab[] {
+  const contentsStart = 2026 + Math.floor((Math.max(year, 2026) - 2026) / 4) * 4
   return [
-    { key: 'cover', label: '표지', href: '/cover', color: COVER_COLOR },
+    { key: 'cover', label: 'Cover', href: `/cover/${year}`, color: COVER_COLOR },
+    { key: 'contents', label: 'Contents', href: `/contents/${contentsStart}`, color: CONTENTS_COLOR },
     ...MONTH_COLORS.map((color, i) => ({
       key: `m${String(i + 1).padStart(2, '0')}`,
-      label: `${i + 1}월`,
+      label: MONTH_LABELS[i].slice(0, 3),
       href: `/month/${yearMonth(year, i + 1)}`,
       color,
     })),
-    { key: 'note', label: '메모', href: '/note', color: NOTE_COLOR },
+    { key: 'note', label: 'Notes', href: `/note?year=${year}`, color: NOTE_COLOR },
   ]
 }
 
 /** 지금 보고 있는 화면에 해당하는 탭. 주간 페이지는 그 주가 시작하는 달을 켠다. */
 function activeKey(pathname: string): string {
   if (pathname.startsWith('/cover')) return 'cover'
+  if (pathname.startsWith('/contents')) return 'contents'
   if (pathname.startsWith('/note')) return 'note'
 
   const match = pathname.match(/^\/(?:month|week)\/\d{4}-(\d{2})/)
@@ -41,9 +46,12 @@ function activeKey(pathname: string): string {
 }
 
 /** 주소에 연도가 있으면 그 해를, 없으면 올해를 기준으로 탭을 만든다 */
-function yearFromPath(pathname: string, fallback: number): number {
-  const match = pathname.match(/^\/(?:month|week)\/(\d{4})-/)
-  return match ? Number(match[1]) : fallback
+function yearFromPath(pathname: string, fallback: number, noteYear: string | null): number {
+  const match = pathname.match(/^\/(?:cover\/(\d{4})$|contents\/(\d{4})$|(?:month|week)\/(\d{4})-)/)
+  if (match) return Number(match[1] ?? match[2] ?? match[3])
+  return pathname === '/note' && /^\d{4}$/.test(noteYear ?? '')
+    ? Number(noteYear)
+    : fallback
 }
 
 export function IndexTabs({
@@ -54,7 +62,8 @@ export function IndexTabs({
   currentYear: number
 }) {
   const pathname = usePathname()
-  const tabs = buildTabs(yearFromPath(pathname, currentYear))
+  const searchParams = useSearchParams()
+  const tabs = buildTabs(yearFromPath(pathname, currentYear, searchParams.get('year')))
   const active = activeKey(pathname)
 
   if (orientation === 'top') {

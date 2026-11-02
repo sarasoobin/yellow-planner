@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { MONTH_COLORS, yearMonth } from '@/lib/month-colors'
+import { MONTH_LABELS } from '@/lib/dates'
 
 /**
  * 표지의 월별 완료율.
@@ -27,11 +28,11 @@ export function MonthlyProgress({
     <section className="w-full">
       <div className="mb-2 flex items-baseline justify-between">
         <h2 className="text-xs font-semibold tracking-[0.1em] text-ink-soft">
-          월별 달성
+          Yearly progress
         </h2>
         {yearTotal > 0 && (
           <span className="text-[12px] text-ink-faint">
-            올해 {yearTotal}개 중 {yearDone}개
+            {yearDone} of {yearTotal} complete
           </span>
         )}
       </div>
@@ -48,13 +49,13 @@ export function MonthlyProgress({
                 href={`/month/${yearMonth(year, i + 1)}`}
                 title={
                   month.total
-                    ? `${i + 1}월 — ${month.total}개 중 ${month.done}개 (${percent}%)`
-                    : `${i + 1}월 — 아직 없음`
+                    ? `${MONTH_LABELS[i]} — ${month.done} of ${month.total} complete (${percent}%)`
+                    : `${MONTH_LABELS[i]} — nothing yet`
                 }
                 aria-label={
                   month.total
-                    ? `${i + 1}월, ${month.total}개 중 ${month.done}개 달성`
-                    : `${i + 1}월, 아직 적은 것 없음`
+                    ? `${MONTH_LABELS[i]}, ${month.done} of ${month.total} complete`
+                    : `${MONTH_LABELS[i]}, nothing yet`
                 }
                 className="flex w-full flex-col justify-end rounded-[2px] bg-rule/35 transition-opacity hover:opacity-75"
                 style={{ height: `${BAR_HEIGHT}px` }}

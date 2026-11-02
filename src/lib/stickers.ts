@@ -5,8 +5,8 @@
  * 요약하면: SVG를 public/stickers/ 에 넣고, 아래 목록에 한 줄 추가.
  */
 export const STICKERS = [
-  { key: 'circle', label: '동그라미', src: '/stickers/circle.svg' },
-  { key: 'star', label: '별', src: '/stickers/star.svg' },
+  { key: 'circle', label: 'Circle', src: '/stickers/circle.svg' },
+  { key: 'star', label: 'Star', src: '/stickers/star.svg' },
 ] as const
 
 export type StickerKey = (typeof STICKERS)[number]['key']
@@ -25,9 +25,9 @@ export function stickerSrc(key: string | null | undefined): string | null {
  * 글 안에 저장되는 색이라 var() 를 쓰면 sanitize.ts 가 걸러낸다.
  */
 export const HIGHLIGHTS = [
-  { key: 'lavender', label: '라벤더', hex: '#D7BDF1' },
-  { key: 'orchid', label: '오키드', hex: '#F0B7DD' },
-  { key: 'rose', label: '로즈', hex: '#F8C0C9' },
+  { key: 'lavender', label: 'Lavender', hex: '#D7BDF1' },
+  { key: 'orchid', label: 'Orchid', hex: '#F0B7DD' },
+  { key: 'rose', label: 'Rose', hex: '#F8C0C9' },
 ] as const
 
 export type HighlightKey = (typeof HIGHLIGHTS)[number]['key']

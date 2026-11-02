@@ -17,7 +17,7 @@ function Button({ variant }: { variant: 'solid' | 'quiet' }) {
           : 'cursor-pointer text-sm text-ink-faint underline underline-offset-4 transition-colors hover:text-accent disabled:opacity-60'
       }
     >
-      {pending ? '노트 펼치는 중…' : '데모 계정으로 둘러보기'}
+      {pending ? 'Opening planner…' : 'Explore the demo'}
     </button>
   )
 }

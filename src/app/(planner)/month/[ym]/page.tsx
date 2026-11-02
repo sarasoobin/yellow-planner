@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { MonthBoard, type CalendarDay } from '@/components/month-board'
@@ -14,21 +14,15 @@ import {
   monthFirstDay,
   monthGrid,
   monthLabel,
+  monthName,
   parseYearMonth,
+  shiftYearMonth,
   todayISO,
 } from '@/lib/dates'
 import { loadCalendarSources } from '@/lib/supabase/calendar'
 import type { Item } from '@/lib/types'
 
 type Params = { params: Promise<{ ym: string }> }
-
-/** 월간 메모 카드 아래의 작은 장식. 적는 자리를 침범하지 않는 크기로만 둔다. */
-const MONTH_CHARACTERS = [
-  { src: '/mandu/tearful.jpeg', width: 736, height: 506 },
-  { src: '/mandu/glasses.jpeg', width: 210, height: 210 },
-  { src: '/mandu/grumpy.jpeg', width: 210, height: 210 },
-  { src: '/mandu/night.jpeg', width: 210, height: 210 },
-] as const
 
 export async function generateMetadata({ params }: Params) {
   const { ym } = await params
@@ -45,7 +39,8 @@ export default async function MonthPage({ params }: Params) {
   const firstDay = monthFirstDay(ym)
   const today = todayISO()
   const path = `/month/${ym}`
-  const character = MONTH_CHARACTERS[(Number(ym.slice(5, 7)) - 1) % MONTH_CHARACTERS.length]
+  const previousMonth = shiftYearMonth(ym, -1)
+  const nextMonth = shiftYearMonth(ym, 1)
 
   const supabase = await createClient()
   const {
@@ -95,7 +90,7 @@ export default async function MonthPage({ params }: Params) {
       stickers={stickers}
       date={firstDay}
       path={path}
-      className="flex flex-1 flex-col bg-paper px-3 py-3 md:px-4 md:py-4 lg:flex-row lg:px-0 lg:py-0"
+      className="vintage-paper flex flex-1 flex-col bg-paper px-3 py-3 md:px-4 md:py-4 lg:flex-row lg:px-0 lg:py-0"
     >
       {/*
         화면이 좁아져 달력 칸에 글자를 넣기 어려울 때만 월 이름·메모를 위로 올린다.
@@ -103,23 +98,39 @@ export default async function MonthPage({ params }: Params) {
       */}
       <header className="mb-3 flex shrink-0 items-start gap-3 border-b border-rule pb-3 sm:items-center sm:gap-5 lg:order-1 lg:mb-0 lg:w-52 lg:flex-col lg:items-stretch lg:gap-2 lg:border-b-0 lg:border-r lg:px-3 lg:py-4 xl:w-56">
         <div className="flex shrink-0 flex-col gap-1">
-          <h1 className="font-sans text-3xl leading-none font-bold text-ink sm:text-4xl">
-            {monthLabel(ym)}
-          </h1>
-          <Image
-            aria-hidden
-            src={character.src}
-            alt=""
-            width={character.width}
-            height={character.height}
-            sizes="44px"
-            className="h-9 w-auto self-center object-contain mix-blend-multiply sm:h-11 lg:hidden"
-          />
+          <div className="grid w-full grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center">
+            {previousMonth && (
+              <Link
+                href={`/month/${previousMonth}`}
+                aria-label={`Previous month, ${monthLabel(previousMonth)}`}
+                className="grid size-9 place-items-center justify-self-start rounded-full border border-edge/80 bg-paper/70 text-2xl leading-none text-ink shadow-[0_1px_3px_rgba(95,83,96,.16)] transition-colors hover:bg-frame hover:text-accent"
+              >
+                ‹
+              </Link>
+            )}
+            <h1 className="min-w-0 flex-1 text-center text-ink">
+              <span className="font-hand block text-3xl leading-[0.9] sm:text-4xl">
+                {monthName(ym)}
+              </span>
+              <span className="mt-2 block text-[15px] font-semibold tracking-[0.16em] text-ink-soft sm:text-base">
+                {ym.slice(0, 4)}
+              </span>
+            </h1>
+            {nextMonth && (
+              <Link
+                href={`/month/${nextMonth}`}
+                aria-label={`Next month, ${monthLabel(nextMonth)}`}
+                className="grid size-9 place-items-center justify-self-end rounded-full border border-edge/80 bg-paper/70 text-2xl leading-none text-ink shadow-[0_1px_3px_rgba(95,83,96,.16)] transition-colors hover:bg-frame hover:text-accent"
+              >
+                ›
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="min-w-0 flex-1">
           <p className="mb-1 text-[10px] font-semibold tracking-[0.1em] text-ink-faint lg:hidden">
-            이번 달 메모
+            Monthly notes
           </p>
           {/* 작은 화면은 세 줄 가로 메모, 큰 화면은 원래의 12줄 세로 메모. */}
           <PaperBlock
@@ -131,18 +142,9 @@ export default async function MonthPage({ params }: Params) {
             style={memo.style}
             minRows={3}
             desktopMinRows={12}
-            placeholder="이 달에 잊지 말 것"
+            placeholder="A note for this month…"
           />
         </div>
-        <Image
-          aria-hidden
-          src={character.src}
-          alt=""
-          width={character.width}
-          height={character.height}
-          sizes="224px"
-          className="mt-auto hidden max-h-28 w-auto max-w-full self-center object-contain mix-blend-multiply lg:block"
-        />
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col lg:order-2 lg:px-5 lg:py-4">
@@ -150,8 +152,8 @@ export default async function MonthPage({ params }: Params) {
 
         {/* 압축 보기에서는 날짜를 눌러 아래에서 일정을 자세히 편집한다. */}
         <p className="mt-2 text-[12px] text-ink-faint lg:hidden">
-          날짜를 누르면 아래에서 그 날의 일정과 체크리스트를 모두 봅니다. 왼쪽{' '}
-          <span className="text-accent">›</span> 는 그 주의 주간 페이지로 갑니다.
+          Select a day to see its plans and checklist below. The left{' '}
+          <span className="text-accent">›</span> opens that week.
         </p>
       </div>
     </StickerLayer>

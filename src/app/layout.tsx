@@ -26,7 +26,7 @@ export const viewport: Viewport = {
    * globals.css 의 --color-frame 과 같은 값이다. CSS 바깥이라 토큰을 못 쓴다.
    * 표지색을 바꾸면 여기와 manifest.ts 도 같이 바꿔야 한다 (DESIGN.md §2).
    */
-  themeColor: "#edc3e8",
+  themeColor: "#f8e8ee",
 };
 
 export const metadata: Metadata = {
@@ -35,8 +35,7 @@ export const metadata: Metadata = {
     default: "正 PLANNER",
     template: "%s",
   },
-  description:
-    "중요한 일정과 자잘한 할 일을 서로 다른 페이지에 적는 웹 다이어리",
+  description: "A vintage paper planner for days, tasks, and little intentions.",
 };
 
 export default function RootLayout({
@@ -46,7 +45,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="ko"
+      lang="en"
       className={`${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>

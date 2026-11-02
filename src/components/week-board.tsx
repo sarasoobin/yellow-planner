@@ -59,10 +59,10 @@ export function WeekBoard({ days, path, sources, children }: {
                   >
                     {/* 요일 · 날짜 · 그 날 한 줄 — 시안의 머리 띠 */}
                     <div className="flex items-center gap-1.5 border-b border-rule px-1.5 py-1.5">
-                      <span className={`shrink-0 text-[12px] tracking-wide ${i === 6 ? 'text-today' : 'text-ink-faint'}`}>
+                      <span className={`shrink-0 text-[13px] tracking-wide ${i === 6 ? 'text-today' : 'text-ink-faint'}`}>
                         {WEEKDAY_EN[i]}
                       </span>
-                      <span className={`grid size-[22px] shrink-0 place-items-center rounded-full text-[14px] leading-none font-bold ${
+                      <span className={`grid size-[24px] shrink-0 place-items-center rounded-full text-[15px] leading-none font-bold ${
                         day.isToday ? 'bg-today text-paper' : 'text-ink'
                       }`}>
                         {dayNumber(day.date)}
@@ -75,8 +75,8 @@ export function WeekBoard({ days, path, sources, children }: {
                         color={day.daily.color}
                         style={day.daily.style}
                         minRows={1}
-                        lineHeight={20}
-                        fontSize={13}
+                        lineHeight={22}
+                        fontSize={14}
                         ruled={false}
                         className="min-w-0 flex-1"
                       />
@@ -85,7 +85,7 @@ export function WeekBoard({ days, path, sources, children }: {
                     <div className="flex flex-1 flex-col px-1.5 pt-1 pb-2">
                       {/* 달력 하루 칸을 그대로 작은 네모 안에 넣고, 아래는 주간 자유 할 일칸으로 둔다. */}
                       <div className="mb-1 rounded-sm border border-edge/80 bg-frame/15 px-1 py-0.5">
-                        <p className="border-b border-rule/80 pb-0.5 text-[10px] tracking-wide text-ink-faint">달력 일정</p>
+                        <p className="border-b border-rule/80 pb-0.5 text-[11px] tracking-wide text-ink-faint">Calendar plans</p>
                         <CalendarDayEditor
                           key={`${day.date}-${revision}`}
                           date={day.date}
@@ -106,7 +106,7 @@ export function WeekBoard({ days, path, sources, children }: {
                         color={day.task.color}
                         style={day.task.style}
                         minRows={8}
-                        placeholder={day.hint ? '할 일을 적어보세요' : undefined}
+                        placeholder={day.hint ? 'Write a task…' : undefined}
                         className="flex-1"
                       />
                     </div>

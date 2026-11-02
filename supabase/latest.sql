@@ -79,7 +79,7 @@ alter table public.items add constraint items_style_object
 
 alter table public.items drop constraint if exists items_kind_check;
 alter table public.items add constraint items_kind_check
-  check (kind in ('year', 'month', 'event', 'task', 'daily', 'sticker'));
+  check (kind in ('year', 'month', 'event', 'task', 'daily', 'contents', 'sticker'));
 
 -- 한 칸이 곧 종이 한 면이라 여러 줄이 통째로 들어온다.
 -- 예전엔 한 줄짜리라 200자로 묶어놨었다.
@@ -129,7 +129,7 @@ with grouped as (
     (array_agg(id order by sort_order, created_at, id))[1] as keep_id,
     string_agg(content, '<br>' order by sort_order, created_at, id) as merged_content
   from public.items
-  where kind in ('year', 'month', 'event', 'task', 'daily')
+  where kind in ('year', 'month', 'event', 'task', 'daily', 'contents')
   group by user_id, kind, date
   having count(*) > 1
 ), updated as (
@@ -148,7 +148,7 @@ where item.user_id = grouped.user_id
 drop index if exists public.items_daily_uniq;
 create unique index if not exists items_one_block_per_slot_uniq
   on public.items (user_id, kind, date)
-  where kind in ('year', 'month', 'event', 'task', 'daily');
+  where kind in ('year', 'month', 'event', 'task', 'daily', 'contents');
 
 create or replace function public.save_item_block(
   p_kind text,
@@ -167,7 +167,7 @@ begin
     raise exception '로그인이 필요합니다.';
   end if;
 
-  if p_kind not in ('year', 'month', 'event', 'task', 'daily') then
+  if p_kind not in ('year', 'month', 'event', 'task', 'daily', 'contents') then
     raise exception '저장할 자리를 찾지 못했습니다.';
   end if;
 
@@ -180,7 +180,7 @@ begin
   insert into public.items (user_id, kind, date, content, color, style)
   values (auth.uid(), p_kind, p_date, p_content, p_color, coalesce(p_style, '{}'::jsonb))
   on conflict (user_id, kind, date)
-    where kind in ('year', 'month', 'event', 'task', 'daily')
+    where kind in ('year', 'month', 'event', 'task', 'daily', 'contents')
   do update set
     content = excluded.content,
     color = excluded.color,

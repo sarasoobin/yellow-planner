@@ -76,7 +76,7 @@ export function NoteEditor({
         rows={rows}
         maxLength={5000}
         placeholder={placeholder}
-        aria-label={placeholder || '메모'}
+        aria-label={placeholder || 'Notes'}
         onChange={() => {
           setTypedAt(state)
           scheduleSave()
@@ -87,7 +87,7 @@ export function NoteEditor({
         }}
         // text-sm은 줄 간격까지 같이 지정해서 괘선과 어긋난다. 크기만 준다.
         // 안내 글씨는 PaperBlock 의 것과 같은 농도로 맞춘다. 진하면 적어둔 글로 보인다
-        className="ruled w-full flex-1 resize-none bg-transparent p-0 text-[16px] text-ink-soft outline-none placeholder:text-ink-faint/50"
+        className="ruled w-full flex-1 resize-none bg-transparent p-0 text-[17px] text-ink-soft outline-none placeholder:text-ink-faint/50"
       />
 
       <div className="flex h-4 items-center justify-end gap-2 text-[11px]">
@@ -99,14 +99,14 @@ export function NoteEditor({
               onClick={save}
               className="cursor-pointer underline underline-offset-2"
             >
-              다시 시도
+              Try again
             </button>
           </span>
         )}
-        {pending && <span className="text-ink-faint">저장 중…</span>}
+        {pending && <span className="text-ink-faint">Saving…</span>}
         {saved && !pending && (
           <span role="status" className="text-done">
-            저장됨
+            Saved
           </span>
         )}
       </div>

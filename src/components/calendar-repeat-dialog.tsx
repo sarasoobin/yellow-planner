@@ -87,53 +87,53 @@ export function CalendarRepeatDialog({ selection, onClose, onSave, onDelete }: {
           else setFailed(true)
         })
       }}>
-        <h2 id={titleId} className="text-lg font-bold">일정 설정</h2>
+        <h2 id={titleId} className="text-lg font-bold">Plan settings</h2>
         <p id={descriptionId} className="mt-1 break-words text-sm text-ink-soft">{selection.title}</p>
-        <p className="mt-1 text-xs text-ink-faint">시작일 {selection.sourceDate} · 선택일 {selection.occurrenceDate}</p>
+        <p className="mt-1 text-xs text-ink-faint">Starts {selection.sourceDate} · selected {selection.occurrenceDate}</p>
 
         <fieldset disabled={saving} className="mt-5 border-t border-rule pt-3">
-          <legend className="mb-2 text-sm font-semibold">메모</legend>
-          <textarea aria-label="일정 메모" value={memo} maxLength={5000} onChange={(event) => setMemo(event.target.value)}
-            placeholder="이 일정에 관한 메모를 적어보세요"
+          <legend className="mb-2 text-sm font-semibold">Notes</legend>
+          <textarea aria-label="Plan notes" value={memo} maxLength={5000} onChange={(event) => setMemo(event.target.value)}
+            placeholder="Add a note about this plan…"
             className="min-h-24 w-full resize-y rounded-lg border border-rule bg-paper px-3 py-2 text-sm leading-relaxed outline-accent placeholder:text-ink-faint/70" />
         </fieldset>
 
         <fieldset disabled={saving} className="mt-4 space-y-1 border-t border-rule pt-3">
-          <legend className="mb-2 text-sm font-semibold">일정 방식</legend>
+          <legend className="mb-2 text-sm font-semibold">Schedule</legend>
           <label className={`flex min-h-10 cursor-pointer items-center justify-between rounded-lg px-3 text-sm ${mode === 'one' ? 'bg-frame/65 font-semibold' : 'hover:bg-frame/25'}`}>
-            하루 일정
+            One day
             <input type="radio" name="schedule-mode" checked={mode === 'one'} onChange={() => chooseMode('one')} className="size-4 accent-accent" />
           </label>
           <label className={`flex min-h-10 cursor-pointer items-center justify-between rounded-lg px-3 text-sm ${mode === 'period' ? 'bg-frame/65 font-semibold' : 'hover:bg-frame/25'}`}>
-            기간 일정
+            Date range
             <input type="radio" name="schedule-mode" checked={mode === 'period'} onChange={() => chooseMode('period')} className="size-4 accent-accent" />
           </label>
           <label className={`flex min-h-10 cursor-pointer items-center justify-between rounded-lg px-3 text-sm ${mode === 'repeat' ? 'bg-frame/65 font-semibold' : 'hover:bg-frame/25'}`}>
-            반복 일정
+            Repeating
             <input type="radio" name="schedule-mode" checked={mode === 'repeat'} onChange={() => chooseMode('repeat')} className="size-4 accent-accent" />
           </label>
         </fieldset>
 
         {mode === 'period' && (
           <fieldset disabled={saving} className="mt-4 border-t border-rule pt-3">
-            <legend className="text-sm font-semibold">일정 기간</legend>
-            <p className="mt-1 text-xs leading-relaxed text-ink-faint">시작일과 종료일을 모두 포함해 매일 달력에 표시됩니다.</p>
-            <label className="mt-3 block min-w-0 text-xs text-ink-soft">시작일
-              <input type="date" value={selection.sourceDate} readOnly aria-label="일정 시작일"
+          <legend className="text-sm font-semibold">Date range</legend>
+          <p className="mt-1 text-xs leading-relaxed text-ink-faint">This plan appears on every day from start through end.</p>
+          <label className="mt-3 block min-w-0 text-xs text-ink-soft">Start date
+              <input type="date" value={selection.sourceDate} readOnly aria-label="Start date"
                 className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-rule bg-frame/20 px-2 text-sm text-ink-soft outline-none" />
             </label>
-            <label className="mt-3 block min-w-0 text-xs text-ink-soft">종료일
-              <input type="date" aria-label="일정 종료일" required min={selection.sourceDate} value={endDate} onChange={(event) => setEndDate(event.target.value)}
+            <label className="mt-3 block min-w-0 text-xs text-ink-soft">End date
+              <input type="date" aria-label="End date" required min={selection.sourceDate} value={endDate} onChange={(event) => setEndDate(event.target.value)}
                 className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-rule bg-paper px-2 text-sm outline-accent" />
             </label>
-            {invalidEnd && <p role="alert" className="mt-2 text-xs text-danger">종료일은 시작일 이후로 선택해주세요.</p>}
+            {invalidEnd && <p role="alert" className="mt-2 text-xs text-danger">Choose an end date after the start date.</p>}
           </fieldset>
         )}
 
         {mode === 'repeat' && (
           <>
           <fieldset disabled={saving} className="mt-4 space-y-1 border-t border-rule pt-3">
-            <legend className="mb-2 text-sm font-semibold">반복 주기</legend>
+            <legend className="mb-2 text-sm font-semibold">Repeat</legend>
             {REPEAT_FREQUENCIES.filter((frequency) => frequency !== 'none').map((frequency) => (
               <label key={frequency} className={`flex min-h-10 cursor-pointer items-center justify-between rounded-lg px-3 text-sm ${repeat === frequency ? 'bg-frame/65 font-semibold' : 'hover:bg-frame/25'}`}>
                 {REPEAT_LABELS[frequency]}
@@ -143,48 +143,48 @@ export function CalendarRepeatDialog({ selection, onClose, onSave, onDelete }: {
             ))}
           </fieldset>
           <fieldset disabled={saving} className="mt-4 border-t border-rule pt-3">
-            <legend className="text-sm font-semibold">반복 종료일</legend>
+            <legend className="text-sm font-semibold">Repeat ends</legend>
             <div className="flex gap-5 py-2 text-sm">
-              <label className="flex items-center gap-2"><input type="radio" name="end" checked={!hasEnd} onChange={() => setHasEnd(false)} className="accent-accent" />없음</label>
-              <label className="flex items-center gap-2"><input type="radio" name="end" checked={hasEnd} onChange={() => setHasEnd(true)} className="accent-accent" />날짜 지정</label>
+              <label className="flex items-center gap-2"><input type="radio" name="end" checked={!hasEnd} onChange={() => setHasEnd(false)} className="accent-accent" />Never</label>
+              <label className="flex items-center gap-2"><input type="radio" name="end" checked={hasEnd} onChange={() => setHasEnd(true)} className="accent-accent" />On a date</label>
             </div>
             {hasEnd && (
               <div className="mt-1">
-                <label className="block min-w-0 text-xs text-ink-soft">종료일
-                  <input type="date" aria-label="반복 종료일" required min={selection.sourceDate} value={endDate} onChange={(event) => setEndDate(event.target.value)}
+                <label className="block min-w-0 text-xs text-ink-soft">End date
+                  <input type="date" aria-label="Repeat end date" required min={selection.sourceDate} value={endDate} onChange={(event) => setEndDate(event.target.value)}
                     className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-rule bg-paper px-2 text-sm outline-accent" />
                 </label>
               </div>
             )}
-            {invalidEnd && <p role="alert" className="mt-2 text-xs text-danger">시작일 이후의 날짜를 선택해주세요.</p>}
-            <p className="mt-2 text-xs leading-relaxed text-ink-faint">종료 날짜의 할 일까지 달력에 표시됩니다.</p>
+            {invalidEnd && <p role="alert" className="mt-2 text-xs text-danger">Choose an end date after the start date.</p>}
+            <p className="mt-2 text-xs leading-relaxed text-ink-faint">The plan stays on the calendar through this date.</p>
           </fieldset>
           </>
         )}
-        {failed && <p role="alert" className="mt-3 text-sm text-danger">저장하지 못했어요. 연결을 확인하고 다시 저장해주세요.</p>}
+        {failed && <p role="alert" className="mt-3 text-sm text-danger">Could not save. Check your connection and try again.</p>}
         {canDelete && (
           <div className="mt-4 border-t border-rule pt-3">
-            <p className="mb-2 text-sm font-semibold">{isRepeating ? '반복 일정 삭제' : '일정 삭제'}</p>
+            <p className="mb-2 text-sm font-semibold">{isRepeating ? 'Delete repeating plan' : 'Delete plan'}</p>
             <div className="grid gap-2">
               {isRepeating ? <>
                 <button type="button" disabled={saving} onClick={() => deleteRepeat('one')}
                   className="min-h-10 rounded-lg border border-rule px-3 text-left text-sm hover:bg-frame/35 disabled:opacity-50">
-                  이 날짜만 삭제
+                  Delete this date only
                 </button>
                 <button type="button" disabled={saving} onClick={() => deleteRepeat('all')}
                   className="min-h-10 rounded-lg border border-danger/35 px-3 text-left text-sm text-danger hover:bg-danger/10 disabled:opacity-50">
-                  반복 전체 삭제
+                  Delete every occurrence
                 </button>
               </> : <button type="button" disabled={saving} onClick={() => deleteRepeat('all')}
                 className="min-h-10 rounded-lg border border-danger/35 px-3 text-left text-sm text-danger hover:bg-danger/10 disabled:opacity-50">
-                이 일정 삭제
+                Delete this plan
               </button>}
             </div>
           </div>
         )}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" disabled={saving} onClick={onClose} className="min-h-11 rounded-lg px-4 text-sm hover:bg-frame/25 disabled:opacity-50">취소</button>
-          <button type="submit" disabled={saving || invalidEnd} className="min-h-11 rounded-lg bg-frame px-5 text-sm font-semibold text-ink disabled:opacity-50">{saving ? '저장 중…' : '저장'}</button>
+          <button type="button" disabled={saving} onClick={onClose} className="min-h-11 rounded-lg px-4 text-sm hover:bg-frame/25 disabled:opacity-50">Cancel</button>
+          <button type="submit" disabled={saving || invalidEnd} className="min-h-11 rounded-lg bg-frame px-5 text-sm font-semibold text-ink disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
         </div>
       </form>
     </dialog>

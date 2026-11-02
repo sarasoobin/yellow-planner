@@ -21,7 +21,21 @@ import {
 /** 주 시작 요일: 월요일 */
 const WEEK_OPTS = { weekStartsOn: 1 } as const
 
-export const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
+export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+export const MONTH_LABELS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 
 /** Date -> 'YYYY-MM-DD' (로컬 시간 기준) */
 export function toISODate(date: Date): string {
@@ -100,22 +114,33 @@ export function dayNumber(dateISO: string): number {
   return Number(dateISO.slice(8, 10))
 }
 
-/** '2026-07-15' -> '7월 15일 (수)'. 폰 월간에서 고른 날의 머리에 쓴다 */
+/** '2026-07-15' -> 'Wednesday, July 15'. */
 export function dayLabel(dateISO: string): string {
   const date = fromISODate(dateISO)
   if (!date) return dateISO
 
-  // getDay() 는 일요일이 0이다. 이 앱은 월요일이 첫 칸이라 한 칸씩 당긴다
-  const weekday = WEEKDAY_LABELS[(date.getDay() + 6) % 7]
-  return `${Number(dateISO.slice(5, 7))}월 ${Number(dateISO.slice(8, 10))}일 (${weekday})`
+  return format(date, 'EEEE, MMMM d')
 }
 
-/** '2026-07' -> '7월' */
+/** '2026-07' -> 'July 2026' */
 export function monthLabel(ym: string): string {
-  return `${Number(ym.slice(5, 7))}월`
+  const date = parseYearMonth(ym)
+  return date ? format(date, 'MMMM yyyy') : ym
 }
 
-/** 주간 페이지 제목: '7월 20일 – 26일' (달이 바뀌면 양쪽 다 표시) */
+/** '2026-06' -> 'June'. 월 제목을 두 줄로 조판할 때 쓴다. */
+export function monthName(ym: string): string {
+  const date = parseYearMonth(ym)
+  return date ? format(date, 'MMMM') : ym
+}
+
+/** 한 달 앞·뒤를 포함해 월간 주소를 안전하게 잇는다. */
+export function shiftYearMonth(ym: string, offset: number): string | null {
+  const date = parseYearMonth(ym)
+  return date ? format(new Date(date.getFullYear(), date.getMonth() + offset, 1), 'yyyy-MM') : null
+}
+
+/** 주간 페이지 제목: 'July 20 – 26' (달이 바뀌면 양쪽 다 표시) */
 export function weekRangeLabel(startISO: string): string {
   const days = weekDays(startISO)
   if (days.length !== 7) return startISO
@@ -126,8 +151,8 @@ export function weekRangeLabel(startISO: string): string {
 
   const sameMonth = days[0].slice(0, 7) === days[6].slice(0, 7)
   return sameMonth
-    ? `${format(start, 'M월 d일')} – ${format(end, 'd일')}`
-    : `${format(start, 'M월 d일')} – ${format(end, 'M월 d일')}`
+    ? `${format(start, 'MMMM d')} – ${format(end, 'd')}`
+    : `${format(start, 'MMMM d')} – ${format(end, 'MMMM d')}`
 }
 
 /**

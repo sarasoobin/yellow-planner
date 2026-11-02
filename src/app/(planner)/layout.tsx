@@ -64,7 +64,7 @@ export default async function PlannerLayout({
               </span>
               <form action={signOut}>
                 <button className="cursor-pointer underline underline-offset-4 hover:text-accent">
-                  로그아웃
+                Sign out
                 </button>
               </form>
             </div>

@@ -37,7 +37,7 @@ const HEX = z.string().regex(/^#[0-9A-Fa-f]{6}$/, '색 형식이 올바르지 �
 const MAX_LENGTH = 5000
 
 /** 종이 한 칸으로 저장하는 종류. sticker는 여러 장을 붙일 수 있어 별도 액션만 쓴다. */
-const BLOCK_KINDS = ['year', 'month', 'event', 'task', 'daily'] as const
+const BLOCK_KINDS = ['year', 'month', 'event', 'task', 'daily', 'contents'] as const
 const STICKER_KEYS = STICKERS.map((sticker) => sticker.key) as [
   (typeof STICKERS)[number]['key'],
   ...(typeof STICKERS)[number]['key'][],
@@ -97,6 +97,8 @@ function dbError(error: { code?: string } | null, fallback: string): string {
 function revalidatePathFor(path: string) {
   const allowed =
     path === '/cover' ||
+    /^\/cover\/[1-9]\d{3}$/.test(path) ||
+    /^\/contents(?:\/[1-9]\d{3})?$/.test(path) ||
     path === '/note' ||
     /^\/month\/\d{4}-(0[1-9]|1[0-2])$/.test(path) ||
     /^\/week\/\d{4}-\d{2}-\d{2}$/.test(path)

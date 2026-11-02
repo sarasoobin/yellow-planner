@@ -38,9 +38,9 @@ export function CalendarBoard({ sources, children }: {
       {children({ controller, revision, onDetails: setDetails, onRenameTitle: setRename })}
 
       <div aria-live="polite" className="mt-1 min-h-4 text-xs text-ink-faint">
-        {controller.status === 'pending' && '저장 중…'}
+        {controller.status === 'pending' && 'Saving…'}
         {controller.status === 'error' && <span role="alert" className="text-danger">{controller.error}{' '}
-          <button type="button" className="underline underline-offset-2" onClick={() => startTransition(async () => { await controller.flush() })}>다시 저장</button>
+          <button type="button" className="underline underline-offset-2" onClick={() => startTransition(async () => { await controller.flush() })}>Save again</button>
         </span>}
       </div>
 
@@ -94,25 +94,25 @@ function TitleRenameDialog({ rename, onClose, onPick }: {
     <div role="dialog" aria-modal="true" aria-labelledby="title-rename-heading"
       className="fixed inset-0 z-50 grid place-items-center bg-ink/25 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-edge bg-paper p-5 text-ink shadow-xl">
-        <h2 id="title-rename-heading" className="text-lg font-bold">반복 일정 이름 변경</h2>
+        <h2 id="title-rename-heading" className="text-lg font-bold">Rename repeating plan</h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          {previous}을(를) {next}로 바꿀까요?
+          Change “{previous}” to “{next}”?
         </p>
         <div className="mt-5 grid gap-2">
           <button type="button" disabled={saving !== null}
             onClick={() => { setSaving('one'); startTransition(async () => { await onPick('one'); setSaving(null) }) }}
             className="min-h-11 rounded-lg border border-rule px-4 text-left text-sm hover:bg-frame/40 disabled:opacity-50">
-            이 날짜만 변경
+            Change this date only
           </button>
           <button type="button" disabled={saving !== null}
             onClick={() => { setSaving('all'); startTransition(async () => { await onPick('all'); setSaving(null) }) }}
             className="min-h-11 rounded-lg bg-frame px-4 text-left text-sm font-semibold hover:bg-edge/60 disabled:opacity-50">
-            반복 일정 전체 변경
+            Change every occurrence
           </button>
         </div>
         <button type="button" disabled={saving !== null} onClick={onClose}
           className="mt-4 min-h-10 rounded-lg px-3 text-sm text-ink-faint hover:bg-frame/25 disabled:opacity-50">
-          취소
+          Cancel
         </button>
       </div>
     </div>

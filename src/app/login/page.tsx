@@ -2,12 +2,12 @@ import { LoginForm } from './login-form'
 import { DemoButton } from '@/components/demo-button'
 
 export const metadata = {
-  title: '로그인 · 正 PLANNER',
+  title: 'Sign in · 正 PLANNER',
 }
 
 const DEMO_MESSAGES: Record<string, string> = {
-  off: '지금은 데모 계정을 쓸 수 없습니다. 직접 가입해서 둘러봐주세요.',
-  failed: '데모 계정에 들어가지 못했습니다. 잠시 후 다시 시도해주세요.',
+  off: 'The demo account is unavailable right now. Please create an account to explore.',
+  failed: 'Could not open the demo account. Please try again shortly.',
 }
 
 export default async function LoginPage({
@@ -38,7 +38,7 @@ export default async function LoginPage({
           <div className="mt-8 border-t border-rule pt-5 text-center">
             <DemoButton variant="quiet" />
             <p className="mt-1.5 text-xs text-ink-faint">
-              가입 없이 채워진 노트를 볼 수 있습니다
+              Explore a filled-in planner without signing up
             </p>
           </div>
         </div>

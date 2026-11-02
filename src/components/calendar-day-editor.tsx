@@ -21,7 +21,7 @@ export type CalendarTitleRename = {
 }
 
 function InfoButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return <button type="button" aria-label={label} title="일정 설정" onClick={onClick}
+  return <button type="button" aria-label={label} title="Plan settings" onClick={onClick}
     className="grid size-5 shrink-0 place-items-center self-start rounded focus-visible:outline-2 focus-visible:outline-accent md:size-[18px]">
     <span aria-hidden className="grid size-[13px] place-items-center rounded-full border border-[#bd6aae] bg-transparent text-[9px] leading-none font-bold text-[#a64c98] md:size-3 md:text-[8px]">i</span>
   </button>
@@ -379,17 +379,17 @@ export function CalendarDayEditor({ date, leading, controller, onDetails, onRena
 
   return (
     <div data-cal-cell data-cal-date={date} data-cal-end={lastStoredId ?? ''}
-      className={`${mobile ? 'text-[15px]' : 'text-[13px]'} ${aiming ? 'rounded-sm bg-frame/25' : ''} ${className}`}
+      className={`${mobile ? 'text-[16px]' : 'text-[14px]'} ${aiming ? 'rounded-sm bg-frame/25' : ''} ${className}`}
       style={{ color: source?.color ?? undefined }}>
       <div data-cal-row data-cal-date={date} data-cal-title=""
         className={`group/row flex min-w-0 items-start gap-0.5 rounded-sm ${aiming?.place === 'title' ? 'bg-accent/10 ring-1 ring-accent' : ''}`}>
         {leading}
         {titleDrag
-          ? <CalendarGrip item={titleDrag} always={showGrip} label={`${calendarText(primaryTitle)} 순서 바꾸기`}
+          ? <CalendarGrip item={titleDrag} always={showGrip} label={`Reorder ${calendarText(primaryTitle)}`}
               onArrow={(direction) => direction === 1 && !primaryRecurringTitle ? { date, place: 'after', afterId: null } : null} />
           : !hideDetails && <span aria-hidden className="w-2.5 shrink-0" />}
-        <CalendarTextLine value={primaryTitle} ariaLabel={`${date} 중요 일정`}
-          placeholder={hint ? '중요 일정' : ''}
+        <CalendarTextLine value={primaryTitle} ariaLabel={`${date} primary plan`}
+          placeholder={hint ? 'Important plan' : ''}
           onChange={(text) => {
             if (primaryRecurringTitle) recurringTitleDrafts.current.set(primaryRecurringTitle.date, text)
             else if (titleRepeats) titleDraft.current = text
@@ -420,7 +420,7 @@ export function CalendarDayEditor({ date, leading, controller, onDetails, onRena
           }}
           className={`${lineHeightClass} w-full min-w-0 resize-none overflow-hidden rounded-sm bg-transparent font-bold text-ink outline-none focus:bg-frame/20`}
         />
-        {!hideDetails && hasCalendarText(primaryTitle) && <InfoButton label={`${calendarText(primaryTitle)} 일정 설정`} onClick={() => {
+        {!hideDetails && hasCalendarText(primaryTitle) && <InfoButton label={`${calendarText(primaryTitle)} plan settings`} onClick={() => {
           save()
           onDetails({
             sourceDate: primaryRecurringTitle?.date ?? date,
@@ -436,10 +436,10 @@ export function CalendarDayEditor({ date, leading, controller, onDetails, onRena
         const inheritedTitle = calendarTitleForDate(entry.note, date)
         return (
           <div key={entry.date} className={`group/row flex items-start gap-1 text-xs leading-5 font-bold ${hideDetails ? '' : 'pl-6'}`}>
-            <CalendarGrip always={showGrip} label={`${calendarText(inheritedTitle)} 순서 바꾸기`}
+            <CalendarGrip always={showGrip} label={`Reorder ${calendarText(inheritedTitle)}`}
               item={{ sourceDate: entry.date, occurrenceDate: date, id: null, kind: 'event', text: inheritedTitle,
                 memo: entry.note.titleMemo ?? '', repeat: entry.note.titleRepeat, endsAt: entry.note.titleEndsAt, done: false }} />
-            <CalendarTextLine value={inheritedTitle} ariaLabel={`${date} 반복 중요 일정`}
+            <CalendarTextLine value={inheritedTitle} ariaLabel={`${date} repeating primary plan`}
               className="min-h-5 w-full min-w-0 resize-none overflow-hidden rounded-sm bg-transparent py-0 leading-5 font-bold text-ink outline-none focus:bg-frame/20"
               onChange={(text) => recurringTitleDrafts.current.set(entry.date, text)}
               onBlur={() => {
@@ -454,7 +454,7 @@ export function CalendarDayEditor({ date, leading, controller, onDetails, onRena
                 if (event.key === 'Enter') { event.preventDefault(); save() }
               }}
             />
-            {!hideDetails && <InfoButton label={`${calendarText(inheritedTitle)} 일정 설정`} onClick={() => onDetails({ sourceDate: entry.date, occurrenceDate: date, title: calendarText(inheritedTitle), memo: entry.note.titleMemo ?? '', repeat: entry.note.titleRepeat, endsAt: entry.note.titleEndsAt })} />}
+            {!hideDetails && <InfoButton label={`${calendarText(inheritedTitle)} plan settings`} onClick={() => onDetails({ sourceDate: entry.date, occurrenceDate: date, title: calendarText(inheritedTitle), memo: entry.note.titleMemo ?? '', repeat: entry.note.titleRepeat, endsAt: entry.note.titleEndsAt })} />}
           </div>
         )
       })}
@@ -473,20 +473,20 @@ export function CalendarDayEditor({ date, leading, controller, onDetails, onRena
             {dropIndex === index && <DropLine />}
             <div data-cal-row data-cal-date={date} data-cal-before={before ?? ''} data-cal-after={after ?? ''}
               className={`group/row flex min-w-0 items-start gap-0.5 ${held?.occurrenceDate === date && held.id === task.id ? 'opacity-40' : ''}`}>
-              {taskText.trim() ? <CalendarGrip always={showGrip} label={`${taskText} 순서 바꾸기`}
+              {taskText.trim() ? <CalendarGrip always={showGrip} label={`Reorder ${taskText}`}
                 item={{ sourceDate, occurrenceDate: date, id: task.id, kind, text: task.text, memo: task.memo ?? '', repeat: task.repeat, endsAt: task.endsAt, done }}
                 onArrow={(direction) => taskArrowSpot(direction, { date, kind, inheritedTask, storedIndex, visibleStoredTasks, titleTaken: hasCalendarText(titleValue) })} />
                 : !hideDetails && <span aria-hidden className="w-2.5 shrink-0" />}
               {kind === 'todo' ? (
                 <label className="grid size-6 shrink-0 cursor-pointer place-items-center md:h-[22px] md:w-5">
-                  <input type="checkbox" aria-label={`${taskText || '빈 할 일'} 완료`} checked={done} disabled={!taskText.trim()}
+                  <input type="checkbox" aria-label={`Complete ${taskText || 'empty task'}`} checked={done} disabled={!taskText.trim()}
                     onChange={(event) => { change(sourceDate, { type: 'complete', id: task.id, date, done: event.target.checked }); save() }}
                     className="size-[13px] cursor-pointer appearance-none rounded-[2px] border border-ink-faint/65 bg-transparent checked:border-ink-faint/65 checked:bg-transparent checked:after:block checked:after:text-center checked:after:text-[12px] checked:after:leading-[10px] checked:after:font-bold checked:after:text-today checked:after:content-['✓'] focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default" />
                 </label>
               ) : !hideDetails && <span aria-hidden className="size-6 shrink-0 md:h-[22px] md:w-5" />}
               <div className="min-w-0 flex-1">
-                <CalendarTextLine value={task.text} ariaLabel={`${date} 할 일 ${index + 1}`}
-                  placeholder={hint && !hasCalendarText(task.text) ? '할 일' : ''}
+                <CalendarTextLine value={task.text} ariaLabel={`${date} task ${index + 1}`}
+                  placeholder={hint && !hasCalendarText(task.text) ? 'Task' : ''}
                   inputRef={(element) => { if (element) inputs.current.set(key, element); else inputs.current.delete(key) }}
                   onChange={(text) => {
                     if (inheritedTask) inheritedTaskDrafts.current.set(key, text)
@@ -538,7 +538,7 @@ export function CalendarDayEditor({ date, leading, controller, onDetails, onRena
                   className={`block ${taskLineHeightClass} w-full min-w-0 resize-none overflow-hidden rounded-sm bg-transparent outline-none focus:bg-frame/20 ${kind === 'event' ? 'font-bold text-ink' : ''} ${done ? 'text-ink-faint line-through' : ''}`}
                 />
               </div>
-              {!hideDetails && taskText.trim() && <InfoButton label={`${taskText} 일정 설정`} onClick={() => { save(); onDetails({ sourceDate, occurrenceDate: date, id: task.id, title: taskText, memo: task.memo ?? '', repeat: task.repeat, endsAt: task.endsAt }) }} />}
+              {!hideDetails && taskText.trim() && <InfoButton label={`${taskText} plan settings`} onClick={() => { save(); onDetails({ sourceDate, occurrenceDate: date, id: task.id, title: taskText, memo: task.memo ?? '', repeat: task.repeat, endsAt: task.endsAt }) }} />}
             </div>
           </Fragment>
         })}
